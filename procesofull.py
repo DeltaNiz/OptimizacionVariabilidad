@@ -8,7 +8,7 @@ import scipy.optimize as sciopti
 import os
 import pandas as pd
 
-data = 'ngc6397/datarevision'
+data = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion/data'
 stars = [d for d in os.listdir(data) if os.path.isdir(os.path.join(data, d))]
 
 for star in stars:
@@ -17,11 +17,9 @@ for star in stars:
     star_number = int(star[4:]) 
 
     fileV = next((f for f in files if f.endswith('V')), None)
-    fileI = next((f for f in files if f.endswith('I')), None)
+    fileI = next((f for f in files if f.endswith('i')), None)
 
     if fileV and fileI:
-        if star_number != 600:
-            continue
 
         print(80*'-')
         print(f'processing star {star_number}: {fileV}, {fileI}')
@@ -40,7 +38,7 @@ for star in stars:
         fluxI = dataI[:,1]
 
         #------------------------------GLS-----------------------------------
-        Pend = 1
+        Pend = 3
         clp = pyPeriod.Gls((time, flux), norm="ZK", Pbeg=0.01, Pend=Pend)
         #clp.info()
 
