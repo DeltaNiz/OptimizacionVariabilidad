@@ -7,6 +7,7 @@ import scipy.interpolate as sciinter
 import scipy.optimize as sciopti
 import os
 import pandas as pd
+import time as t
 
 data = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion/data'
 stars = [d for d in os.listdir(data) if os.path.isdir(os.path.join(data, d))]
@@ -19,10 +20,13 @@ for star in stars:
     fileV = next((f for f in files if f.endswith('V')), None)
     fileI = next((f for f in files if f.endswith('i')), None)
 
+    
+
     if fileV and fileI:
 
         print(80*'-')
         print(f'processing star {star_number}: {fileV}, {fileI}')
+        init_time = t.time()
         print(80*'-')
 
         dataV= np.loadtxt(os.path.join(route, fileV))
@@ -184,7 +188,7 @@ for star in stars:
         ax[1,0].plot(equis, lequis, color='black', linestyle='--')
         ax[1,0].axvline(periodpdmV, color='darkmagenta', linestyle='--', label=f'Period = {periodpdmV:.5f} days')
         ax[1,0].set_xlabel("Period")
-        ax[1,0].set_ylabel("$\Theta$")
+        ax[1,0].set_ylabel(r"$\Theta$")
         ax[1,0].set_xlim(clp.Pbeg,clp.Pend) 
         ax[1,0].legend()
 
@@ -193,7 +197,7 @@ for star in stars:
         ax[1,1].plot(equisI, lequisI, color='black', linestyle='--')
         ax[1,1].axvline(periodpdmI, color='darkmagenta', linestyle='--', label=f'Period = {periodpdmI:.5f} days')
         ax[1,1].set_xlabel("Period")
-        ax[1,1].set_ylabel("$\Theta$")
+        ax[1,1].set_ylabel(r"$\Theta$")
         ax[1,1].set_xlim(clpI.Pbeg,clpI.Pend)
         ax[1,1].legend()
 
@@ -205,3 +209,6 @@ for star in stars:
         plt.savefig(figrute1)
         #plt.savefig(figrute2)
         plt.close()
+        end_time = t.time()  # End timing
+        elapsed_time = (end_time - init_time) / 60  # Convert to minutes
+        print(f'Tiempo de analisis de la estrella {star_number}: {elapsed_time:.2f} minutos')
