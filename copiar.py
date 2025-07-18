@@ -2,9 +2,10 @@ import os
 import pandas as pd
 import shutil
 
-carpeta1 = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion/lc_i'
-carpeta2 = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion/lc_v'
-data = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion/data'
+ruta_base = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion'
+carpeta1 = os.path.join(ruta_base, 'lc_i')
+carpeta2 = os.path.join(ruta_base, 'lc_v')
+data = os.path.join(ruta_base, 'data')
 
 df = pd.read_csv('magnitudCMD1516.csv', skiprows=0, header=None)
 #print(df)
