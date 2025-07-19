@@ -115,7 +115,7 @@ class Main(QMainWindow):
         
         # Crear pie de página
         footer_label = QLabel()
-        footer_text = "Nombre de aplicación | Versión 1.0.0"
+        footer_text = "Nombre de aplicación | Versión 0.0.1"
         footer_label.setText(footer_text)
         footer_label.setAlignment(Qt.AlignCenter)
         footer_label.setStyleSheet("""
