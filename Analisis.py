@@ -183,6 +183,52 @@ def ejecutar_copiar_py(ruta_csv):
         print(f"ERROR al ejecutar copiar.py: {e}")
         return False, ""
 
+def ejecutar_procesofull_py(data_folder):
+    """Ejecuta procesofull.py automáticamente con la carpeta de datos generada"""
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        ruta_procesofull = os.path.join(script_dir, 'procesofull.py')
+        
+        if not os.path.exists(ruta_procesofull):
+            print(f"ADVERTENCIA: No se encontró procesofull.py en: {ruta_procesofull}")
+            return False
+        
+        print(f"=== EJECUTANDO PROCESOFULL.PY ===")
+        print(f"Carpeta de datos: {data_folder}")
+        print("-" * 40)
+        
+        # Ejecutar procesofull.py con parámetros y mostrar output en tiempo real
+        proceso = subprocess.Popen([
+            sys.executable, ruta_procesofull,
+            '--data_folder', data_folder
+        ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
+        
+        # Leer y mostrar output línea por línea en tiempo real
+        while True:
+            output = proceso.stdout.readline()
+            if output == '' and proceso.poll() is not None:
+                break
+            if output:
+                print(output.strip())
+        
+        rc = proceso.poll()
+        
+        if rc == 0:
+            print("-" * 40)
+            print("ÉXITO: Procesamiento de estrellas completado")
+            return True
+        else:
+            print("-" * 40)
+            print("ERROR al ejecutar procesofull.py")
+            print(f"Código de retorno: {rc}")
+            return False
+            
+    except Exception as e:
+        print(f"ERROR al ejecutar procesofull.py: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def realizar_analisis_completo(table_main, table_descartadas, datos_formulario):
     """Método principal para realizar el análisis completo con los datos filtrados"""
     try:
@@ -205,12 +251,23 @@ def realizar_analisis_completo(table_main, table_descartadas, datos_formulario):
             # Ejecutar copiar.py automáticamente
             exito_copia, nombre_subcarpeta = ejecutar_copiar_py(ruta_csv)
             
-            print("Análisis completado exitosamente")
-            
             if exito_copia and nombre_subcarpeta:
-                return True, f"El archivo CSV ha sido generado automáticamente:\n\n{os.path.basename(ruta_csv)}\n\nEstrellas exportadas: {len(datos_filtrados)}\nUbicación: {os.path.dirname(ruta_csv)}\n\n✅ Archivos copiados con copiar.py\n📁 Subcarpeta creada: data/{nombre_subcarpeta}"
+                # Construir ruta completa de la carpeta de datos
+                ruta_base = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion'
+                data_folder = os.path.join(ruta_base, 'data', nombre_subcarpeta)
+                
+                # Ejecutar procesofull.py automáticamente
+                exito_proceso = ejecutar_procesofull_py(data_folder)
+                
+                print("Análisis completado exitosamente")
+                
+                if exito_proceso:
+                    return True, f"El archivo CSV ha sido generado automáticamente:\n\n{os.path.basename(ruta_csv)}\n\nEstrellas exportadas: {len(datos_filtrados)}\nUbicación: {os.path.dirname(ruta_csv)}\n\nArchivos copiados con copiar.py\nSubcarpeta creada: data/{nombre_subcarpeta}\n\nProcesamiento de estrellas completado con procesofull.py"
+                else:
+                    return True, f"El archivo CSV ha sido generado automáticamente:\n\n{os.path.basename(ruta_csv)}\n\nEstrellas exportadas: {len(datos_filtrados)}\nUbicación: {os.path.dirname(ruta_csv)}\n\nArchivos copiados con copiar.py\nSubcarpeta creada: data/{nombre_subcarpeta}\n\nError al procesar estrellas con procesofull.py"
             else:
-                return True, f"El archivo CSV ha sido generado automáticamente:\n\n{os.path.basename(ruta_csv)}\n\nEstrellas exportadas: {len(datos_filtrados)}\nUbicación: {os.path.dirname(ruta_csv)}\n\n⚠️ Error al copiar archivos"
+                print("Análisis completado exitosamente")
+                return True, f"El archivo CSV ha sido generado automáticamente:\n\n{os.path.basename(ruta_csv)}\n\nEstrellas exportadas: {len(datos_filtrados)}\nUbicación: {os.path.dirname(ruta_csv)}\n\nError al copiar archivos"
         else:
             return False, "Error al generar el archivo CSV"
             
@@ -300,20 +357,20 @@ def procesar_csv_analisis(ruta_csv, parametros):
             print()
             
             # Información adicional sobre datos faltantes
-            print("🔍 ANÁLISIS DE CALIDAD DE DATOS:")
+            print("ANÁLISIS DE CALIDAD DE DATOS:")
             print("-" * 40)
             for col in df.columns:
                 valores_faltantes = df[col].isna().sum()
                 if valores_faltantes > 0:
-                    print(f"⚠️  Columna {col}: {valores_faltantes} valores faltantes")
+                    print(f"Columna {col}: {valores_faltantes} valores faltantes")
                 else:
-                    print(f"✅ Columna {col}: Sin valores faltantes")
+                    print(f"Columna {col}: Sin valores faltantes")
         else:
-            print("⚠️  El CSV está vacío")
+            print("El CSV está vacío")
         
         print()
         print("=" * 80)
-        print("✅ ANÁLISIS COMPLETADO EXITOSAMENTE")
+        print("ANÁLISIS COMPLETADO EXITOSAMENTE")
         print("=" * 80)
         
     except Exception as e:

@@ -8,207 +8,261 @@ import scipy.optimize as sciopti
 import os
 import pandas as pd
 import time as t
+import sys
+import argparse
 
-data = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion/data/analisis_20250722_180246'
-stars = [d for d in os.listdir(data) if os.path.isdir(os.path.join(data, d))]
-
-for star in stars:
-    route = os.path.join(data, star)
-    files = os.listdir(route)
-    star_number = int(star[4:]) 
-
-    fileV = next((f for f in files if f.endswith('V')), None)
-    fileI = next((f for f in files if f.endswith('i')), None)
-
+def main():
+    # Configurar argumentos de línea de comandos
+    parser = argparse.ArgumentParser(description='Procesar análisis de estrellas')
+    parser.add_argument('--data_folder', help='Ruta de la carpeta con los datos de las estrellas')
     
+    args = parser.parse_args()
+    
+    # Determinar carpeta de datos
+    if args.data_folder:
+        data = args.data_folder
+    else:
+        data = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion/data/analisis_20250722_180246'
+    
+    print(f"=== PROCESANDO ANÁLISIS DE ESTRELLAS ===")
+    print(f"Carpeta de datos: {data}")
+    print("-" * 50)
+    
+    if not os.path.exists(data):
+        print(f"ERROR: No se encontró la carpeta de datos: {data}")
+        return
+    
+    stars = [d for d in os.listdir(data) if os.path.isdir(os.path.join(data, d))]
+    
+    if not stars:
+        print(f"ERROR: No se encontraron carpetas de estrellas en: {data}")
+        return
+    
+    print(f"Estrellas encontradas: {len(stars)}")
+    print("-" * 50)
+    
+    inicio_total = t.time()
+    
+    for idx, star in enumerate(stars):
+        print(f"\nProcesando estrella {idx + 1}/{len(stars)}: {star}")
+        route = os.path.join(data, star)
+        files = os.listdir(route)
+        star_number = int(star[4:]) 
 
-    if fileV and fileI:
+        fileV = next((f for f in files if f.endswith('V')), None)
+        fileI = next((f for f in files if f.endswith('i')), None)
 
-        print(80*'-')
-        print(f'processing star {star_number}: {fileV}, {fileI}')
-        init_time = t.time()
-        print(80*'-')
+        if fileV and fileI:
+            print(f"Archivos encontrados: {fileV}, {fileI}")
+            init_time = t.time()
+            
+            try:
+                print("Cargando datos...")
+                dataV= np.loadtxt(os.path.join(route, fileV))
+                dataI= np.loadtxt(os.path.join(route, fileI))
 
-        dataV= np.loadtxt(os.path.join(route, fileV))
-        dataI= np.loadtxt(os.path.join(route, fileI))
+                dataredV=dataV[::2]
+                dataredI=dataI[::2]
 
-        dataredV=dataV[::2]
-        dataredI=dataI[::2]
+                time = dataV[:,0]
+                flux = dataV[:,1]
 
-        time = dataV[:,0]
-        flux = dataV[:,1]
+                timeI = dataI[:,0]
+                fluxI = dataI[:,1]
 
-        timeI = dataI[:,0]
-        fluxI = dataI[:,1]
+                print("Ejecutando análisis GLS...")
+                #------------------------------GLS-----------------------------------
+                Pend = 3
+                clp = pyPeriod.Gls((time, flux), norm="ZK", Pbeg=0.01, Pend=Pend)
+                #clp.info()
 
-        #------------------------------GLS-----------------------------------
-        Pend = 3
-        clp = pyPeriod.Gls((time, flux), norm="ZK", Pbeg=0.01, Pend=Pend)
-        #clp.info()
+                fapLevels = np.array([0.1, 0.05, 0.01, 0.001])
+                plevels = clp.powerLevel(fapLevels)
 
-        fapLevels = np.array([0.1, 0.05, 0.01, 0.001])
-        plevels = clp.powerLevel(fapLevels)
+                ifmax = np.argmax(clp.power)
 
-        ifmax = np.argmax(clp.power)
+                pmax = clp.power[ifmax]
+                fmax = clp.freq[ifmax]
 
-        pmax = clp.power[ifmax]
-        fmax = clp.freq[ifmax]
+                hpp = 1./fmax
 
-        hpp = 1./fmax
+                freqstep=clp.fstep
+                periodos= (1./clp.freq)
+                power=clp.power
 
-        freqstep=clp.fstep
-        periodos= (1./clp.freq)
-        power=clp.power
-
-        clpI = pyPeriod.Gls((timeI, fluxI), norm="ZK", Pbeg=0.01, Pend=Pend)
-
-
-        fapLevelsI = np.array([0.1, 0.05, 0.01, 0.001])
-        plevelsI = clpI.powerLevel(fapLevels)
-        ifmaxI = np.argmax(clpI.power)
-
-        pmaxI = clpI.power[ifmaxI]
-        fmaxI = clpI.freq[ifmaxI]
-
-        hppI = 1./fmaxI
-
-        freqstepI=clpI.fstep
-        periodosI= (1./clpI.freq)
-        powerI=clpI.power
-
-        #-----------------------------PDM--------------------------------------
-        S = pyPDM.Scanner(minVal=(1./clp.Pend), maxVal=(1./clp.Pbeg), dVal=freqstep, mode="frequency")
-        P = pyPDM.PyPDM(time, flux)
-
-        f1, t1 = P.pdmEquiBinCover(7, 3, S)
-        thetmin1=np.min(t1)
-        periodpdmV = (1/f1)[np.argmin(t1)]
-
-        equis= np.linspace(0, 10.0, 2)
-        lequis=np.array([thetmin1 for i in range(len(equis))])
-
-        periodo1 = (1/f1)
+                clpI = pyPeriod.Gls((timeI, fluxI), norm="ZK", Pbeg=0.01, Pend=Pend)
 
 
-        SI = pyPDM.Scanner(minVal=(1./clpI.Pend), maxVal=(1./clpI.Pbeg), dVal=freqstepI, mode="frequency")
-        PI = pyPDM.PyPDM(timeI,  fluxI)
+                fapLevelsI = np.array([0.1, 0.05, 0.01, 0.001])
+                plevelsI = clpI.powerLevel(fapLevels)
+                ifmaxI = np.argmax(clpI.power)
 
-        f2, t2 = PI.pdmEquiBinCover(7, 3, SI)
-        thetmin2=np.min(t2)
-        periodpdmI = (1/f2)[np.argmin(t2)]
+                pmaxI = clpI.power[ifmaxI]
+                fmaxI = clpI.freq[ifmaxI]
 
-        equisI= np.linspace(0, 10.0, 2)
-        lequisI=np.array([thetmin2 for i in range(len(equisI))])
+                hppI = 1./fmaxI
 
-        periodo2 = (1/f2)
+                freqstepI=clpI.fstep
+                periodosI= (1./clpI.freq)
+                powerI=clpI.power
 
-        #-----------------------------Frequency Peaks--------------------------------------
-        from scipy.signal import find_peaks
+                print("Ejecutando análisis PDM...")
+                #-----------------------------PDM--------------------------------------
+                S = pyPDM.Scanner(minVal=(1./clp.Pend), maxVal=(1./clp.Pbeg), dVal=freqstep, mode="frequency")
+                P = pyPDM.PyPDM(time, flux)
 
-        peaksglsv, _ = find_peaks(clp.power, height=plevels[3], prominence=0.3 * np.max(clp.power), distance=90)
-        peaksglsi, _ = find_peaks(clpI.power, height=plevelsI[3], prominence=0.3 * np.max(clp.power), distance=90)
+                f1, t1 = P.pdmEquiBinCover(7, 3, S)
+                thetmin1=np.min(t1)
+                periodpdmV = (1/f1)[np.argmin(t1)]
 
-        peakspdmv, _ = find_peaks(-t1, prominence= 0.28*(np.max(t1)-np.min(t1)), distance=90)
-        peakspdmi, _ = find_peaks(-t2, prominence= 0.28*(np.max(t2)-np.min(t2)), distance=90)
+                equis= np.linspace(0, 10.0, 2)
+                lequis=np.array([thetmin1 for i in range(len(equis))])
 
-        peakperiodsv = 1./clp.freq[peaksglsv]
-        peakperiodsi = 1./clpI.freq[peaksglsi]
+                periodo1 = (1/f1)
 
-        pdmperiodsv = 1./f1[peakspdmv]
-        pdmperiodsi = 1./f2[peakspdmi]
 
-        #---sort---
-        sortglsv = np.argsort(clp.power[peaksglsv])[::-1][:30]
-        sortglsi = np.argsort(clpI.power[peaksglsi])[::-1][:30]
-        sortpdmv = np.argsort(t1[peakspdmv])[:30]
-        sortpdmi = np.argsort(t2[peakspdmi])[:30]
+                SI = pyPDM.Scanner(minVal=(1./clpI.Pend), maxVal=(1./clpI.Pbeg), dVal=freqstepI, mode="frequency")
+                PI = pyPDM.PyPDM(timeI,  fluxI)
 
-        freqsglsv = (clp.freq[peaksglsv])[sortglsv]
-        freqsglsi = (clpI.freq[peaksglsi])[sortglsi]
-        freqspdmv = (f1[peakspdmv])[sortpdmv]
-        freqspdmi = (f2[peakspdmi])[sortpdmi]
+                f2, t2 = PI.pdmEquiBinCover(7, 3, SI)
+                thetmin2=np.min(t2)
+                periodpdmI = (1/f2)[np.argmin(t2)]
 
-        perglsv = 1./freqsglsv
-        perglsi = 1./freqsglsi
-        perpdmv = 1./freqspdmv
-        perpdmi = 1./freqspdmi
+                equisI= np.linspace(0, 10.0, 2)
+                lequisI=np.array([thetmin2 for i in range(len(equisI))])
 
-        #guardar los peaks en cada caso
-        df = pd.DataFrame({'freq': freqsglsv, 'period': perglsv})
-        df.to_csv(os.path.join(route,'pglsv.csv'), index=False)
+                periodo2 = (1/f2)
 
-        df2 = pd.DataFrame({'freq': freqsglsi, 'period': perglsi})
-        df2.to_csv(os.path.join(route,'pglsi.csv'), index=False)
+                print("Detectando picos de frecuencia...")
+                #-----------------------------Frequency Peaks--------------------------------------
+                from scipy.signal import find_peaks
 
-        df3 = pd.DataFrame({'freq': freqspdmv, 'period': perpdmv})
-        df3.to_csv(os.path.join(route,'ppdmv.csv'), index=False)
+                peaksglsv, _ = find_peaks(clp.power, height=plevels[3], prominence=0.3 * np.max(clp.power), distance=90)
+                peaksglsi, _ = find_peaks(clpI.power, height=plevelsI[3], prominence=0.3 * np.max(clp.power), distance=90)
 
-        df4 = pd.DataFrame({'freq': freqspdmi, 'period': perpdmi})
-        df4.to_csv(os.path.join(route,'ppdmi.csv'), index=False)
+                peakspdmv, _ = find_peaks(-t1, prominence= 0.28*(np.max(t1)-np.min(t1)), distance=90)
+                peakspdmi, _ = find_peaks(-t2, prominence= 0.28*(np.max(t2)-np.min(t2)), distance=90)
+                
+                peakperiodsv = 1./clp.freq[peaksglsv]
+                peakperiodsi = 1./clpI.freq[peaksglsi]
 
-        peakspowerv = clp.power[peaksglsv]
-        peakspoweri = clpI.power[peaksglsi]
+                pdmperiodsv = 1./f1[peakspdmv]
+                pdmperiodsi = 1./f2[peakspdmi]
 
-        minimav = t1[peakspdmv]
-        minimai = t2[peakspdmi]
+                print("Organizando y guardando resultados...")
+                #---sort---
+                sortglsv = np.argsort(clp.power[peaksglsv])[::-1][:30]
+                sortglsi = np.argsort(clpI.power[peaksglsi])[::-1][:30]
+                sortpdmv = np.argsort(t1[peakspdmv])[:30]
+                sortpdmi = np.argsort(t2[peakspdmi])[:30]
 
-        #Los Peaks del GLS son hpp y hppI
-        print(f'Best Peak GLS V: {hpp}')
-        print(f'Best Peak GLS I: {hppI}')
-        print(f'Best Minima PDM V: {periodpdmV}')
-        print(f'Best Minima PDM I: {periodpdmI}')
+                freqsglsv = (clp.freq[peaksglsv])[sortglsv]
+                freqsglsi = (clpI.freq[peaksglsi])[sortglsi]
+                freqspdmv = (f1[peakspdmv])[sortpdmv]
+                freqspdmi = (f2[peakspdmi])[sortpdmi]
 
-        #-----------------------------Plots---------------------------------------
-        f, ax = plt.subplots(2, 2, figsize=(16, 12))
+                perglsv = 1./freqsglsv
+                perglsi = 1./freqsglsi
+                perpdmv = 1./freqspdmv
+                perpdmi = 1./freqspdmi
 
-        ax[0,0].plot((1./clp.freq), clp.power, 'b.-', lw=1.2)
-        #ax[0,0].plot(peakperiodsv, peakspowerv, 'rx', markersize=10, label='Detected Peaks')
-        for i in range(len(fapLevels)):
-            ax[0,0].plot([min(1./clp.freq), max(1./clp.freq)], [plevels[i]]*2, '--')
-        ax[0,0].set_title("GLS and PDM $V$ filter")
-        ax[0,0].axvline(hpp, color='darkmagenta', linestyle='--', label=f'Period = {hpp:.5f} days')
-        ax[0,0].set_ylabel("Power")
-        ax[0,0].set_xlim(clp.Pbeg,clp.Pend)
-        ax[0,0].legend()
-        ax[0,0].set_xticklabels([])
+                #guardar los peaks en cada caso
+                df = pd.DataFrame({'freq': freqsglsv, 'period': perglsv})
+                df.to_csv(os.path.join(route,'pglsv.csv'), index=False)
 
-        ax[0,1].plot((1./clpI.freq), clpI.power, 'b.-', lw=1.2)
-        #ax[0,1].plot(peakperiodsi, peakspoweri, 'rx', markersize=10, label='Detected Peaks')
-        for i in range(len(fapLevels)):
-            ax[0,1].plot([min(1./clpI.freq), max(1./clpI.freq)], [plevelsI[i]]*2, '--')
-        ax[0,1].set_title("GLS and PDM $I$ filter")
-        ax[0,1].axvline(hppI, color='darkmagenta', linestyle='--', label=f'Period = {hppI:.5f} days')
-        ax[0,1].set_ylabel("Power")
-        ax[0,1].set_xlim(clpI.Pbeg,clpI.Pend)
-        ax[0,1].legend()
-        ax[0,1].set_xticklabels([])
+                df2 = pd.DataFrame({'freq': freqsglsi, 'period': perglsi})
+                df2.to_csv(os.path.join(route,'pglsi.csv'), index=False)
 
-        ax[1,0].plot(periodo1, t1, 'kp-', lw=1.2)
-        #ax[1,0].plot(pdmperiodsv, minimav, 'rx', markersize=10, label='Detected Minima')
-        ax[1,0].plot(equis, lequis, color='black', linestyle='--')
-        ax[1,0].axvline(periodpdmV, color='darkmagenta', linestyle='--', label=f'Period = {periodpdmV:.5f} days')
-        ax[1,0].set_xlabel("Period")
-        ax[1,0].set_ylabel(r"$\Theta$")
-        ax[1,0].set_xlim(clp.Pbeg,clp.Pend) 
-        ax[1,0].legend()
+                df3 = pd.DataFrame({'freq': freqspdmv, 'period': perpdmv})
+                df3.to_csv(os.path.join(route,'ppdmv.csv'), index=False)
 
-        ax[1,1].plot(periodo2, t2, 'kp-', lw=1.2)
-        #ax[1,1].plot(pdmperiodsi, minimai, 'rx', markersize=10, label='Detected Minima')
-        ax[1,1].plot(equisI, lequisI, color='black', linestyle='--')
-        ax[1,1].axvline(periodpdmI, color='darkmagenta', linestyle='--', label=f'Period = {periodpdmI:.5f} days')
-        ax[1,1].set_xlabel("Period")
-        ax[1,1].set_ylabel(r"$\Theta$")
-        ax[1,1].set_xlim(clpI.Pbeg,clpI.Pend)
-        ax[1,1].legend()
+                df4 = pd.DataFrame({'freq': freqspdmi, 'period': perpdmi})
+                df4.to_csv(os.path.join(route,'ppdmi.csv'), index=False)
 
-        plt.subplots_adjust(hspace=0)
-        figname1 = 'GLSPDM.png'
-        figrute1 = os.path.join(route, figname1)
-        #figname2 = 'GLSPDM.pdf'
-        #figrute2 = os.path.join(route, figname2)
-        plt.savefig(figrute1)
-        #plt.savefig(figrute2)
-        plt.close()
-        end_time = t.time()  # End timing
-        elapsed_time = (end_time - init_time) / 60  # Convert to minutes
-        print(f'Tiempo de analisis de la estrella {star_number}: {elapsed_time:.2f} minutos')
+                peakspowerv = clp.power[peaksglsv]
+                peakspoweri = clpI.power[peaksglsi]
+
+                minimav = t1[peakspdmv]
+                minimai = t2[peakspdmi]
+
+                #Los Peaks del GLS son hpp y hppI
+                print(f'Best Peak GLS V: {hpp}')
+                print(f'Best Peak GLS I: {hppI}')
+                print(f'Best Minima PDM V: {periodpdmV}')
+                print(f'Best Minima PDM I: {periodpdmI}')
+
+                print("Generando gráficos...")
+                #-----------------------------Plots---------------------------------------
+                f, ax = plt.subplots(2, 2, figsize=(16, 12))
+
+                ax[0,0].plot((1./clp.freq), clp.power, 'b.-', lw=1.2)
+                #ax[0,0].plot(peakperiodsv, peakspowerv, 'rx', markersize=10, label='Detected Peaks')
+                for i in range(len(fapLevels)):
+                    ax[0,0].plot([min(1./clp.freq), max(1./clp.freq)], [plevels[i]]*2, '--')
+                ax[0,0].set_title("GLS and PDM $V$ filter")
+                ax[0,0].axvline(hpp, color='darkmagenta', linestyle='--', label=f'Period = {hpp:.5f} days')
+                ax[0,0].set_ylabel("Power")
+                ax[0,0].set_xlim(clp.Pbeg,clp.Pend)
+                ax[0,0].legend()
+                ax[0,0].set_xticklabels([])
+
+                ax[0,1].plot((1./clpI.freq), clpI.power, 'b.-', lw=1.2)
+                #ax[0,1].plot(peakperiodsi, peakspoweri, 'rx', markersize=10, label='Detected Peaks')
+                for i in range(len(fapLevels)):
+                    ax[0,1].plot([min(1./clpI.freq), max(1./clpI.freq)], [plevelsI[i]]*2, '--')
+                ax[0,1].set_title("GLS and PDM $I$ filter")
+                ax[0,1].axvline(hppI, color='darkmagenta', linestyle='--', label=f'Period = {hppI:.5f} days')
+                ax[0,1].set_ylabel("Power")
+                ax[0,1].set_xlim(clpI.Pbeg,clpI.Pend)
+                ax[0,1].legend()
+                ax[0,1].set_xticklabels([])
+
+                ax[1,0].plot(periodo1, t1, 'kp-', lw=1.2)
+                #ax[1,0].plot(pdmperiodsv, minimav, 'rx', markersize=10, label='Detected Minima')
+                ax[1,0].plot(equis, lequis, color='black', linestyle='--')
+                ax[1,0].axvline(periodpdmV, color='darkmagenta', linestyle='--', label=f'Period = {periodpdmV:.5f} days')
+                ax[1,0].set_xlabel("Period")
+                ax[1,0].set_ylabel(r"$\Theta$")
+                ax[1,0].set_xlim(clp.Pbeg,clp.Pend) 
+                ax[1,0].legend()
+
+                ax[1,1].plot(periodo2, t2, 'kp-', lw=1.2)
+                #ax[1,1].plot(pdmperiodsi, minimai, 'rx', markersize=10, label='Detected Minima')
+                ax[1,1].plot(equisI, lequisI, color='black', linestyle='--')
+                ax[1,1].axvline(periodpdmI, color='darkmagenta', linestyle='--', label=f'Period = {periodpdmI:.5f} days')
+                ax[1,1].set_xlabel("Period")
+                ax[1,1].set_ylabel(r"$\Theta$")
+                ax[1,1].set_xlim(clpI.Pbeg,clpI.Pend)
+                ax[1,1].legend()
+
+                plt.subplots_adjust(hspace=0)
+                figname1 = 'GLSPDM.png'
+                figrute1 = os.path.join(route, figname1)
+                #figname2 = 'GLSPDM.pdf'
+                #figrute2 = os.path.join(route, figname2)
+                plt.savefig(figrute1)
+                #plt.savefig(figrute2)
+                plt.close()
+                
+                end_time = t.time()  # End timing
+                elapsed_time = (end_time - init_time) / 60  # Convert to minutes
+                print(f'Tiempo de análisis: {elapsed_time:.2f} minutos')
+                print(f'Estrella {star_number} completada exitosamente')
+                
+            except Exception as e:
+                end_time = t.time()
+                elapsed_time = (end_time - init_time) / 60
+                print(f'Error procesando estrella {star_number}: {str(e)}')
+                print(f'Tiempo transcurrido antes del error: {elapsed_time:.2f} minutos')
+        else:
+            print(f'Archivos faltantes para estrella {star_number}: V={fileV}, I={fileI}')
+    
+    fin_total = t.time()
+    tiempo_total = (fin_total - inicio_total) / 60
+    print("-" * 50)
+    print(f"Procesamiento completado para {len(stars)} estrellas")
+    print(f"Tiempo total: {tiempo_total:.2f} minutos")
+    print("-" * 50)
+
+if __name__ == "__main__":
+    main()
