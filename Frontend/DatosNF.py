@@ -17,7 +17,7 @@ class DatosNF(QMainWindow):  # Eliminado dataNF
         screen_width = self.screen().size().width()
         # Lógica similar a media queries
         if screen_width <= 1366:  # Pantallas pequeñas/laptops
-            self.resize(600, 400)
+            self.resize(793, 500)
             self.setWindowTitle("Nombre de Aplicación - Pantalla Pequeña")
             margin_size = "150px"  # Menos margen para pantallas pequeñas
             text_size = "24px"  # Tamaño de texto más pequeño
@@ -352,12 +352,20 @@ class DatosNF(QMainWindow):  # Eliminado dataNF
         separator_horizontal.setFrameShadow(QFrame.Sunken)  # Estilo hundido
         separator_horizontal.setLineWidth(1)
         separator_horizontal.setStyleSheet("QFrame { color: #a7c942; }")  # Color verde
-        
         right_layout.addWidget(separator_horizontal)
+
         right_layout.addSpacing(10)  # Espacio entre separador y "Estrellas descartadas"
 
         right_layout.addWidget(label_descartadas)
         right_layout.addWidget(self.table_descartadas)
+
+        #separador horizontal debajo de la tabla descartadas
+        separator_horizontal_descartadas = QFrame()
+        separator_horizontal_descartadas.setFrameShape(QFrame.HLine)  # Línea horizontal
+        separator_horizontal_descartadas.setFrameShadow(QFrame.Sunken)  # Estilo hund
+        separator_horizontal_descartadas.setLineWidth(1)
+        separator_horizontal_descartadas.setStyleSheet("QFrame { color: #a7c942; }")  # Color verde
+        right_layout.addWidget(separator_horizontal_descartadas)
 
         # separacion entre tabla y rango
         right_layout.addSpacing(10)  # Espacio entre tabla y rango
@@ -366,8 +374,20 @@ class DatosNF(QMainWindow):  # Eliminado dataNF
         right_layout.addWidget(label_rango)
         right_layout.addLayout(range_layout)
 
+        #separador horizontal debajo del rango
+        separator_horizontal_rango = QFrame()
+        separator_horizontal_rango.setFrameShape(QFrame.HLine)  # Línea horizontal
+        separator_horizontal_rango.setFrameShadow(QFrame.Sunken)  # Estilo hundido
+        separator_horizontal_rango.setLineWidth(1)
+        separator_horizontal_rango.setStyleSheet("QFrame { color: #a7c942; }")  # Color verde
+
+        #separacion entre rango y separador
+        right_layout.addSpacing(10)  # Espacio entre rango y separador
+
+        right_layout.addWidget(separator_horizontal_rango)
+
         # separacion entre rango y botones
-        right_layout.addSpacing(20)  # Espacio entre rango y botones
+        right_layout.addSpacing(10)  # Espacio entre rango y botones
         
         # Crear layout horizontal para ambos botones (lado a lado)
         buttons_layout = QHBoxLayout()
