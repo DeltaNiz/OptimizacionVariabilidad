@@ -175,7 +175,8 @@ class SubirArchivos(QMainWindow):
 
         # Fila 4: Periodo Máx
         label_periodo_max = QLabel("<b>Periodo Máx:</b>")
-        input_max = QLineEdit("3")
+        input_max = QLineEdit("")
+        input_max.setPlaceholderText("Ej: 3")
         input_max.setFixedWidth(120)  # Controlar ancho del input
         dias_label1 = QLabel("Días")
         max_row = QWidget()
@@ -193,7 +194,8 @@ class SubirArchivos(QMainWindow):
 
         # Fila 5: Periodo Min
         label_periodo_min = QLabel("<b>Periodo Min:</b>")
-        input_min = QLineEdit("2")
+        input_min = QLineEdit("")
+        input_min.setPlaceholderText("Ej: 2")
         input_min.setFixedWidth(120)  # Controlar ancho del input
         dias_label2 = QLabel("Días")
         min_row = QWidget()
@@ -211,7 +213,8 @@ class SubirArchivos(QMainWindow):
 
         # Fila 6: Step (Saltos)
         label_step = QLabel("<b>Step (Saltos):</b>")
-        input_step = QLineEdit("0.1")
+        input_step = QLineEdit("")
+        input_step.setPlaceholderText("Ej: 0.1")
         input_step.setFixedWidth(120)  # Controlar ancho del input
         dias_label3 = QLabel("Días")
         step_row = QWidget()
@@ -420,6 +423,10 @@ class SubirArchivos(QMainWindow):
 
     def abrir_datos_nf(self):
         """Función para abrir la ventana de DatosNF con loader"""
+        # Validar que todos los campos estén completos
+        if not self.validar_formulario():
+            return  # No continuar si la validación falla
+        
         # Recopilar datos del formulario
         self.datos_formulario = self.obtener_datos_formulario()
         
@@ -435,6 +442,74 @@ class SubirArchivos(QMainWindow):
         
         # Iniciar el worker
         self.worker.start()
+
+    def validar_formulario(self):
+        """Valida que todos los campos del formulario estén completos"""
+        errores = []
+        
+        # Validar Filtro I
+        if self.combo_I.currentText() == "Seleccione una carpeta...":
+            errores.append("• Debe seleccionar una carpeta para el Filtro I")
+        
+        # Validar Filtro V
+        if self.combo_V.currentText() == "Seleccione una carpeta...":
+            errores.append("• Debe seleccionar una carpeta para el Filtro V")
+        
+        # Validar archivo CSV
+        if self.combo_csv.currentText() == "Seleccione un archivo CSV...":
+            errores.append("• Debe seleccionar un archivo CSV de magnitudes")
+        
+        # Validar Periodo Máx
+        if not self.input_periodo_max.text().strip():
+            errores.append("• Debe ingresar un valor para Periodo Máx")
+        else:
+            try:
+                valor = float(self.input_periodo_max.text().strip())
+                if valor <= 0:
+                    errores.append("• Periodo Máx debe ser un número positivo")
+            except ValueError:
+                errores.append("• Periodo Máx debe ser un número válido")
+        
+        # Validar Periodo Min
+        if not self.input_periodo_min.text().strip():
+            errores.append("• Debe ingresar un valor para Periodo Min")
+        else:
+            try:
+                valor = float(self.input_periodo_min.text().strip())
+                if valor <= 0:
+                    errores.append("• Periodo Min debe ser un número positivo")
+            except ValueError:
+                errores.append("• Periodo Min debe ser un número válido")
+        
+        # Validar Step
+        if not self.input_step.text().strip():
+            errores.append("• Debe ingresar un valor para Step (Saltos)")
+        else:
+            try:
+                valor = float(self.input_step.text().strip())
+                if valor <= 0:
+                    errores.append("• Step debe ser un número positivo")
+            except ValueError:
+                errores.append("• Step debe ser un número válido")
+        
+        # Validar lógica de períodos
+        if (self.input_periodo_max.text().strip() and 
+            self.input_periodo_min.text().strip()):
+            try:
+                max_val = float(self.input_periodo_max.text().strip())
+                min_val = float(self.input_periodo_min.text().strip())
+                if max_val <= min_val:
+                    errores.append("• Periodo Máx debe ser mayor que Periodo Min")
+            except ValueError:
+                pass  # Los errores de formato ya se capturaron arriba
+        
+        # Si hay errores, mostrar mensaje y retornar False
+        if errores:
+            mensaje_error = "Faltan campos obligatorios:\n\n" + "\n".join(errores)
+            QMessageBox.warning(self, "Campos Incompletos", mensaje_error)
+            return False
+        
+        return True
 
     def on_carga_completada(self):
         """Se ejecuta cuando la carga de datos se completa exitosamente"""
