@@ -26,8 +26,8 @@ class Main(QMainWindow):
     
     def abrir_ventana_subir_archivo(self):
         """Abre una ventana emergente para subir archivos"""
-        # Crear una instancia de la ventana SubirArchivos
-        self.ventana_subir = SubirArchivos.SubirArchivos()
+        # Crear una instancia de la ventana SubirArchivos pasando referencia a esta ventana
+        self.ventana_subir = SubirArchivos.SubirArchivos(ventana_main=self)
         # Mostrar la ventana como modal (bloquea la ventana principal)
         self.ventana_subir.setWindowModality(Qt.ApplicationModal)
         # Mostrar la ventana
