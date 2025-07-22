@@ -19,25 +19,16 @@ class DatosNF(QMainWindow):  # Eliminado dataNF
         if screen_width <= 1366:  # Pantallas pequeñas/laptops
             self.resize(793, 500)
             self.setWindowTitle("Nombre de Aplicación - Pantalla Pequeña")
-            margin_size = "150px"  # Menos margen para pantallas pequeñas
-            text_size = "24px"  # Tamaño de texto más pequeño
-            vertical_offset = -75
             layout_margin = 10  # Márgenes pequeños para pantallas pequeñas
             print(f"Configuración aplicada: Pantalla pequeña - Ventana: {self.width()}x{self.height()}")
         elif screen_width <= 1920:  # Pantallas medianas/Full HD
             self.resize(773, 500)
             self.setWindowTitle("Nombre de Aplicación - Pantalla Mediana")
-            margin_size = "100px"  # Margen muy pequeño para ventana mediana
-            text_size = "36px"  # Tamaño de texto intermedio
-            vertical_offset = -35
             layout_margin = 5  # Márgenes medianos
             print(f"Configuración aplicada: Pantalla mediana - Ventana: {self.width()}x{self.height()}")
         else:  # Pantallas grandes/4K
             self.resize(1600, 1000)
             self.setWindowTitle("Nombre de Aplicación - Pantalla Grande")
-            margin_size = "300px"  # Margen grande para pantallas grandes
-            text_size = "42px"  # Tamaño de texto grande
-            vertical_offset = -20
             layout_margin = 20  # Márgenes grandes para pantallas grandes
             print(f"Configuración aplicada: Pantalla grande - Ventana: {self.width()}x{self.height()}")
 
@@ -347,12 +338,7 @@ class DatosNF(QMainWindow):  # Eliminado dataNF
         right_layout.addSpacing(8)  # Espacio entre subtítulo y separador
         
         # Crear separador horizontal
-        separator_horizontal = QFrame()
-        separator_horizontal.setFrameShape(QFrame.HLine)  # Línea horizontal
-        separator_horizontal.setFrameShadow(QFrame.Sunken)  # Estilo hundido
-        separator_horizontal.setLineWidth(1)
-        separator_horizontal.setStyleSheet("QFrame { color: #a7c942; }")  # Color verde
-        right_layout.addWidget(separator_horizontal)
+        right_layout.addWidget(self.separador_horizontal())
 
         right_layout.addSpacing(10)  # Espacio entre separador y "Estrellas descartadas"
 
@@ -360,12 +346,7 @@ class DatosNF(QMainWindow):  # Eliminado dataNF
         right_layout.addWidget(self.table_descartadas)
 
         #separador horizontal debajo de la tabla descartadas
-        separator_horizontal_descartadas = QFrame()
-        separator_horizontal_descartadas.setFrameShape(QFrame.HLine)  # Línea horizontal
-        separator_horizontal_descartadas.setFrameShadow(QFrame.Sunken)  # Estilo hund
-        separator_horizontal_descartadas.setLineWidth(1)
-        separator_horizontal_descartadas.setStyleSheet("QFrame { color: #a7c942; }")  # Color verde
-        right_layout.addWidget(separator_horizontal_descartadas)
+        right_layout.addWidget(self.separador_horizontal())
 
         # separacion entre tabla y rango
         right_layout.addSpacing(10)  # Espacio entre tabla y rango
@@ -374,17 +355,11 @@ class DatosNF(QMainWindow):  # Eliminado dataNF
         right_layout.addWidget(label_rango)
         right_layout.addLayout(range_layout)
 
-        #separador horizontal debajo del rango
-        separator_horizontal_rango = QFrame()
-        separator_horizontal_rango.setFrameShape(QFrame.HLine)  # Línea horizontal
-        separator_horizontal_rango.setFrameShadow(QFrame.Sunken)  # Estilo hundido
-        separator_horizontal_rango.setLineWidth(1)
-        separator_horizontal_rango.setStyleSheet("QFrame { color: #a7c942; }")  # Color verde
-
         #separacion entre rango y separador
         right_layout.addSpacing(10)  # Espacio entre rango y separador
 
-        right_layout.addWidget(separator_horizontal_rango)
+        #separador horizontal debajo del rango
+        right_layout.addWidget(self.separador_horizontal())
 
         # separacion entre rango y botones
         right_layout.addSpacing(10)  # Espacio entre rango y botones
@@ -401,11 +376,7 @@ class DatosNF(QMainWindow):  # Eliminado dataNF
         right_layout.addSpacing(10)  # Espacio entre botones y borde inferior
         
         # Crear separador vertical
-        separator = QFrame()
-        separator.setFrameShape(QFrame.VLine)  # Línea vertical
-        separator.setFrameShadow(QFrame.Sunken)  # Estilo hundido
-        separator.setLineWidth(1)
-        separator.setStyleSheet("QFrame { color: #a7c942; }")  # Color verde
+        separator = self.separador_vertical()
         
         # para evitar que la tabla principal ocupe todo el ancho
         main_layout.addWidget(self.table_main, 4)      # Peso 4 (tabla principal)
@@ -443,6 +414,22 @@ class DatosNF(QMainWindow):  # Eliminado dataNF
                         self.table_descartadas.clearSelection()
         
         return super().eventFilter(source, event)
+    
+    def separador_horizontal(self):
+        """Crea un separador horizontal personalizado"""
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setLineWidth(1)
+        separator.setStyleSheet("QFrame { color: #a7c942; }")  # Color verde
+        return separator
+
+    def separador_vertical(self):
+        """Crea un separador vertical personalizado"""
+        separator = QFrame()
+        separator.setFrameShape(QFrame.VLine)
+        separator.setLineWidth(1)
+        separator.setStyleSheet("QFrame { color: #a7c942; }")
+        return separator
 
     def on_table_main_item_clicked(self, item):
         """Maneja el clic en celdas de la tabla principal"""
