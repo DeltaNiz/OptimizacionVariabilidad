@@ -1,13 +1,16 @@
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QTableWidget, QTableWidgetItem, QPushButton, QLabel, QMenuBar, QAction,
-    QLineEdit, QSpinBox, QFrame, QCheckBox
+    QTableWidget, QTableWidgetItem, QPushButton, QLabel,
+    QLineEdit, QFrame, QCheckBox
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QCursor, QColor
 import sys
 import pandas as pd
 import os
+# Importar funciones de análisis
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from Analisis import realizar_analisis_completo
 
 class DatosNF(QMainWindow):
     def __init__(self, datos_formulario=None, ventana_subir=None, ventana_main=None):
@@ -303,6 +306,7 @@ class DatosNF(QMainWindow):
         """)
 
         btn_analisis = QPushButton("Realizar Análisis")
+        btn_analisis.clicked.connect(self.realizar_analisis)  # Conectar al método de análisis
         btn_analisis.setCursor(QCursor(Qt.PointingHandCursor))
         # Controlar el tamaño del botón para que no ocupe todo el ancho
         btn_analisis.setMaximumWidth(200)  # Ancho máximo de 200px
@@ -655,6 +659,29 @@ class DatosNF(QMainWindow):
             print(f"ERROR en abrir_ventana_main: {e}")
             import traceback
             traceback.print_exc()
+
+    def realizar_analisis(self):
+        """Método para realizar el análisis con los datos filtrados usando funciones de Analisis.py"""
+        try:
+            from PyQt5.QtWidgets import QMessageBox
+            
+            # Usar la función de Analisis.py
+            exito, mensaje = realizar_analisis_completo(self.table_main, self.table_descartadas, self.datos_formulario)
+            
+            if exito:
+                # Mostrar mensaje de confirmación
+                QMessageBox.information(self, "CSV Generado", mensaje)
+            else:
+                # Mostrar mensaje de error
+                QMessageBox.warning(self, "Error", mensaje)
+                
+        except Exception as e:
+            error_msg = f"ERROR en realizar_analisis: {e}"
+            print(error_msg)
+            import traceback
+            traceback.print_exc()
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Error", error_msg)
 
     def crear_info_formulario(self):
         """Crea una cadena con información resumida del formulario"""

@@ -9,7 +9,7 @@ import os
 import pandas as pd
 import time as t
 
-data = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion/data'
+data = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion/data/analisis_20250722_180246'
 stars = [d for d in os.listdir(data) if os.path.isdir(os.path.join(data, d))]
 
 for star in stars:
