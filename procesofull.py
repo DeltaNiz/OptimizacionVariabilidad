@@ -39,12 +39,15 @@ def main():
         return
     
     print(f"Estrellas encontradas: {len(stars)}")
+    print(f"Total de estrellas a procesar: {len(stars)}")
     print("-" * 50)
+    sys.stdout.flush()  # Forzar salida inmediata
     
     inicio_total = t.time()
     
     for idx, star in enumerate(stars):
         print(f"\nProcesando estrella {idx + 1}/{len(stars)}: {star}")
+        sys.stdout.flush()  # Forzar salida inmediata
         route = os.path.join(data, star)
         files = os.listdir(route)
         star_number = int(star[4:]) 
@@ -54,10 +57,12 @@ def main():
 
         if fileV and fileI:
             print(f"Archivos encontrados: {fileV}, {fileI}")
+            sys.stdout.flush()
             init_time = t.time()
             
             try:
                 print("Cargando datos...")
+                sys.stdout.flush()
                 dataV= np.loadtxt(os.path.join(route, fileV))
                 dataI= np.loadtxt(os.path.join(route, fileI))
 
@@ -71,6 +76,7 @@ def main():
                 fluxI = dataI[:,1]
 
                 print("Ejecutando análisis GLS...")
+                sys.stdout.flush()
                 #------------------------------GLS-----------------------------------
                 Pend = 3
                 clp = pyPeriod.Gls((time, flux), norm="ZK", Pbeg=0.01, Pend=Pend)
@@ -107,6 +113,7 @@ def main():
                 powerI=clpI.power
 
                 print("Ejecutando análisis PDM...")
+                sys.stdout.flush()
                 #-----------------------------PDM--------------------------------------
                 S = pyPDM.Scanner(minVal=(1./clp.Pend), maxVal=(1./clp.Pbeg), dVal=freqstep, mode="frequency")
                 P = pyPDM.PyPDM(time, flux)
@@ -134,6 +141,7 @@ def main():
                 periodo2 = (1/f2)
 
                 print("Detectando picos de frecuencia...")
+                sys.stdout.flush()
                 #-----------------------------Frequency Peaks--------------------------------------
                 from scipy.signal import find_peaks
 
@@ -150,6 +158,7 @@ def main():
                 pdmperiodsi = 1./f2[peakspdmi]
 
                 print("Organizando y guardando resultados...")
+                sys.stdout.flush()
                 #---sort---
                 sortglsv = np.argsort(clp.power[peaksglsv])[::-1][:30]
                 sortglsi = np.argsort(clpI.power[peaksglsi])[::-1][:30]
@@ -192,6 +201,7 @@ def main():
                 print(f'Best Minima PDM I: {periodpdmI}')
 
                 print("Generando gráficos...")
+                sys.stdout.flush()
                 #-----------------------------Plots---------------------------------------
                 f, ax = plt.subplots(2, 2, figsize=(16, 12))
 
@@ -248,14 +258,17 @@ def main():
                 elapsed_time = (end_time - init_time) / 60  # Convert to minutes
                 print(f'Tiempo de análisis: {elapsed_time:.2f} minutos')
                 print(f'Estrella {star_number} completada exitosamente')
+                sys.stdout.flush()
                 
             except Exception as e:
                 end_time = t.time()
                 elapsed_time = (end_time - init_time) / 60
                 print(f'Error procesando estrella {star_number}: {str(e)}')
                 print(f'Tiempo transcurrido antes del error: {elapsed_time:.2f} minutos')
+                sys.stdout.flush()
         else:
             print(f'Archivos faltantes para estrella {star_number}: V={fileV}, I={fileI}')
+            sys.stdout.flush()
     
     fin_total = t.time()
     tiempo_total = (fin_total - inicio_total) / 60
@@ -263,6 +276,7 @@ def main():
     print(f"Procesamiento completado para {len(stars)} estrellas")
     print(f"Tiempo total: {tiempo_total:.2f} minutos")
     print("-" * 50)
+    sys.stdout.flush()
 
 if __name__ == "__main__":
     main()
