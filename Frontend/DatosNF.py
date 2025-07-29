@@ -1,9 +1,9 @@
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QPushButton, QLabel,
-    QLineEdit, QFrame, QCheckBox
+    QLineEdit, QFrame, QCheckBox, QMessageBox
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QCursor, QColor
 import sys
 import pandas as pd
@@ -663,24 +663,63 @@ class DatosNF(QMainWindow):
     def realizar_analisis(self):
         """Método para realizar el análisis con los datos filtrados usando funciones de Analisis.py"""
         try:
-            from PyQt5.QtWidgets import QMessageBox
+            print("=== INICIANDO ANÁLISIS DESDE DATOSNF ===")
             
             # Usar la función de Analisis.py
             exito, mensaje = realizar_analisis_completo(self.table_main, self.table_descartadas, self.datos_formulario)
             
-            if exito:
-                # Mostrar mensaje de confirmación
-                QMessageBox.information(self, "CSV Generado", mensaje)
-            else:
-                # Mostrar mensaje de error
-                QMessageBox.warning(self, "Error", mensaje)
+            print(f"=== ANÁLISIS COMPLETADO ===")
+            print(f"Éxito: {exito}")
+            print(f"Mensaje completo: {repr(mensaje)}")
+            
+            # Verificar si el mensaje indica que DatosF se abrió exitosamente
+            datosf_abierto = ("✓ Ventana DatosF abierta exitosamente" in str(mensaje) or 
+                            "data_folder_final:" in str(mensaje) or
+                            "DatosF abierto" in str(mensaje))
+            
+            print(f"¿DatosF abierto detectado?: {datosf_abierto}")
+            print(f"¿Análisis exitoso?: {exito}")
+            
+            # CERRAR DATOSNF SI EL ANÁLISIS FUE EXITOSO O DATOSF SE ABRIÓ
+            debe_cerrar = exito or datosf_abierto
+            print(f"¿Debe cerrar DatosNF?: {debe_cerrar}")
+            
+            if debe_cerrar:
+                print("INICIANDO CIERRE FORZADO DE DATOSNF...")
+                # Forzar cierre inmediato independientemente de otras condiciones
+                self.hide()  # Ocultar inmediatamente
+                print("DatosNF ocultado...")
+                
+                # Procesar eventos para asegurar que se oculte
+                from PyQt5.QtWidgets import QApplication
+                app = QApplication.instance()
+                if app:
+                    app.processEvents()
+                    print("Eventos procesados después de hide()...")
+                
+                # Cerrar completamente
+                self.close()
+                print("DatosNF close() ejecutado...")
+                
+                # Procesar eventos nuevamente
+                if app:
+                    app.processEvents()
+                    print("Eventos procesados después de close()...")
+                
+                print("✓ Ventana DatosNF CERRADA FORZADAMENTE")
+                # No continuar con el resto del código si ya se cerró
+                return
+            
+            # Solo mostrar mensaje de error si realmente falló y no se debe cerrar
+            if not exito and not datosf_abierto:
+                QMessageBox.warning(self, "Error en Análisis", mensaje)
+                print("✗ Análisis falló completamente, no se abrirá DatosF")
                 
         except Exception as e:
             error_msg = f"ERROR en realizar_analisis: {e}"
             print(error_msg)
             import traceback
             traceback.print_exc()
-            from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Error", error_msg)
 
     def crear_info_formulario(self):

@@ -7,6 +7,8 @@ import os
 import subprocess
 from datetime import datetime
 import re
+import importlib.util
+import traceback
 
 class VentanaProgreso(QDialog):
     def __init__(self, parent=None):
@@ -189,6 +191,8 @@ class WorkerThread(QThread):
         self.ventana_progreso = ventana_progreso
         self.proceso_actual = None
         self.cancelacion_forzada = False
+        self.data_folder_final = None  # Para guardar la ruta final de los datos
+        self.ruta_csv_generado = None  # Para guardar la ruta del CSV filtrado generado
         
     def forzar_cancelacion(self):
         """Fuerza la cancelación inmediata"""
@@ -234,24 +238,22 @@ class WorkerThread(QThread):
                 self.analisis_terminado.emit(False, "Análisis cancelado por el usuario")
                 return
                 
-            self.fase_analisis.emit("Generando archivo CSV...", 5)
+            self.fase_analisis.emit("Ejecutando copiar.py...", 15)
             self.log_agregado.emit("=== INICIANDO ANÁLISIS ===")
+            self.log_agregado.emit("Ejecutando copiar.py...")
             
-            # Generar CSV automáticamente
-            ruta_csv = self.generar_csv_automatico()
+            # Primero generar CSV temporal para copiar.py
+            ruta_csv_temporal = self.generar_csv_temporal()
             
-            if not ruta_csv or self.ventana_progreso.cancelado:
+            if not ruta_csv_temporal or self.ventana_progreso.cancelado:
                 if self.ventana_progreso.cancelado:
                     self.analisis_terminado.emit(False, "Análisis cancelado por el usuario")
                 else:
-                    self.analisis_terminado.emit(False, "Error al generar el archivo CSV")
+                    self.analisis_terminado.emit(False, "Error al generar el archivo CSV temporal")
                 return
-                
-            self.fase_analisis.emit("Ejecutando copiar.py...", 15)
-            self.log_agregado.emit("Ejecutando copiar.py...")
             
             # Ejecutar copiar.py automáticamente
-            exito_copia, nombre_subcarpeta = self.ejecutar_copiar_py(ruta_csv)
+            exito_copia, nombre_subcarpeta = self.ejecutar_copiar_py(ruta_csv_temporal)
             
             if not exito_copia or self.ventana_progreso.cancelado:
                 if self.ventana_progreso.cancelado:
@@ -260,13 +262,31 @@ class WorkerThread(QThread):
                     self.analisis_terminado.emit(False, "Error al copiar archivos")
                 return
                 
-            self.fase_analisis.emit("Procesando estrellas...", 25)
+            self.fase_analisis.emit("Preparando carpeta de análisis...", 20)
             self.log_agregado.emit(f"Subcarpeta creada: data/{nombre_subcarpeta}")
-            self.log_agregado.emit("Ejecutando procesofull.py...")
             
             # Construir ruta completa de la carpeta de datos
             ruta_base = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion'
             data_folder = os.path.join(ruta_base, 'data', nombre_subcarpeta)
+            
+            # Guardar la ruta para usar después del análisis
+            self.data_folder_final = data_folder
+            
+            self.fase_analisis.emit("Generando archivo CSV final...", 22)
+            self.log_agregado.emit("Generando archivo CSV final en carpeta de análisis...")
+            
+            # Ahora generar el CSV final en la carpeta de análisis
+            ruta_csv = self.generar_csv_automatico()
+            self.ruta_csv_generado = ruta_csv  # Guardar la ruta para DatosF
+            
+            if not ruta_csv or self.ventana_progreso.cancelado:
+                if self.ventana_progreso.cancelado:
+                    self.analisis_terminado.emit(False, "Análisis cancelado por el usuario")
+                else:
+                    self.analisis_terminado.emit(False, "Error al generar el archivo CSV final")
+                return
+                
+            self.fase_analisis.emit("Procesando estrellas...", 25)
             
             # Ejecutar procesofull.py automáticamente
             exito_proceso = self.ejecutar_procesofull_py(data_folder)
@@ -276,6 +296,14 @@ class WorkerThread(QThread):
                 return
             
             if exito_proceso:
+                # Limpiar archivo CSV temporal
+                try:
+                    if os.path.exists(ruta_csv_temporal):
+                        os.remove(ruta_csv_temporal)
+                        self.log_agregado.emit("Archivo CSV temporal eliminado")
+                except Exception as e:
+                    self.log_agregado.emit(f"Nota: No se pudo eliminar archivo temporal: {e}")
+                
                 # Mostrar progreso completo al final
                 self.fase_analisis.emit("¡Análisis completado exitosamente!", 100)
                 mensaje_exito = f"Análisis completado exitosamente\n\nCSV generado: {os.path.basename(ruta_csv)}\nEstrellas procesadas: {len(self.datos_filtrados)}\nSubcarpeta: data/{nombre_subcarpeta}"
@@ -288,8 +316,8 @@ class WorkerThread(QThread):
             self.log_agregado.emit(f"ERROR: {str(e)}")
             self.analisis_terminado.emit(False, f"Error inesperado: {str(e)}")
     
-    def generar_csv_automatico(self):
-        """Genera automáticamente un archivo CSV con los datos filtrados"""
+    def generar_csv_temporal(self):
+        """Genera un archivo CSV temporal en la raíz del proyecto para copiar.py"""
         try:
             # Crear DataFrame con los datos filtrados
             df = pd.DataFrame(self.datos_filtrados)
@@ -301,9 +329,42 @@ class WorkerThread(QThread):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             nombre_archivo = f"datos_filtrados_{timestamp}.csv"
             
-            # Obtener directorio donde está el script principal
+            # Guardar en la raíz del proyecto (para copiar.py)
             directorio_actual = os.path.dirname(os.path.abspath(__file__))
             ruta_archivo = os.path.join(directorio_actual, nombre_archivo)
+            
+            # Guardar CSV sin cabeceras (header=False) y sin índice
+            df.to_csv(ruta_archivo, index=False, header=False)
+            
+            self.log_agregado.emit(f"CSV temporal generado: {nombre_archivo}")
+            self.log_agregado.emit(f"Registros exportados: {len(self.datos_filtrados)}")
+            
+            return ruta_archivo
+            
+        except Exception as e:
+            self.log_agregado.emit(f"Error al generar CSV temporal: {str(e)}")
+            return None
+
+    def generar_csv_automatico(self):
+        """Genera automáticamente un archivo CSV con los datos filtrados"""
+        try:
+            # Verificar que data_folder_final esté disponible
+            if not self.data_folder_final:
+                self.log_agregado.emit("Error: Carpeta de análisis no disponible")
+                return None
+            
+            # Crear DataFrame con los datos filtrados
+            df = pd.DataFrame(self.datos_filtrados)
+            
+            # Seleccionar solo las columnas V, I, MV, MI (sin Numero)
+            df = df[['V', 'I', 'MV', 'MI']]
+            
+            # Generar nombre del archivo con timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            nombre_archivo = f"datos_filtrados_{timestamp}.csv"
+            
+            # Guardar el CSV en la carpeta de análisis en lugar de la raíz del proyecto
+            ruta_archivo = os.path.join(self.data_folder_final, nombre_archivo)
             
             # Guardar CSV sin cabeceras (header=False) y sin índice
             df.to_csv(ruta_archivo, index=False, header=False)
@@ -639,25 +700,145 @@ def realizar_analisis_completo(table_main, table_descartadas, datos_formulario):
         worker.log_agregado.connect(ventana_progreso.agregar_log)
         
         resultado_final = [False, ""]
+        callback_ejecutado = [False]  # Flag para saber si el callback terminó
         
         def on_analisis_terminado(exito, mensaje):
+            print(f"=== ANÁLISIS TERMINADO ===")
+            print(f"Éxito: {exito}")
+            print(f"Mensaje: {mensaje}")
+            print(f"Cancelado: {ventana_progreso.cancelado}")
+            
             if ventana_progreso.cancelado:
+                print("Análisis cancelado, no abriendo DatosF")
                 ventana_progreso.analisis_completado(exito=False, cancelado=True)
             else:
                 ventana_progreso.analisis_completado(exito)
+                
+                # Si el análisis fue exitoso, abrir ventana DatosF
+                if exito and hasattr(worker, 'data_folder_final'):
+                    print(f"Intentando abrir ventana DatosF...")
+                    print(f"data_folder_final: {worker.data_folder_final}")
+                    print(f"ruta_csv_generado: {getattr(worker, 'ruta_csv_generado', 'No disponible')}")
+                    
+                    try:
+                        # Importar DatosF desde Frontend
+                        script_dir = os.path.dirname(os.path.abspath(__file__))
+                        frontend_path = os.path.join(script_dir, 'Frontend')
+                        if frontend_path not in sys.path:
+                            sys.path.append(frontend_path)
+                        
+                        import importlib.util
+                        
+                        print("Importando módulo DatosF...")
+                        datosf_path = os.path.join(frontend_path, 'DatosF.py')
+                        spec = importlib.util.spec_from_file_location("DatosF", datosf_path)
+                        datosf_module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(datosf_module)
+                        
+                        # Crear y mostrar ventana DatosF
+                        print("Creando instancia de DatosF...")
+                        ventana_resultados = datosf_module.DatosF(
+                            data_folder=worker.data_folder_final,
+                            datos_formulario=datos_formulario,
+                            ventana_anterior=None,
+                            ruta_csv_filtrado=worker.ruta_csv_generado if hasattr(worker, 'ruta_csv_generado') else None
+                        )
+                        
+                        print("Mostrando ventana DatosF...")
+                        # Configurar ventana con máxima prioridad y siempre encima
+                        ventana_resultados.setWindowModality(Qt.NonModal)
+                        ventana_resultados.setWindowFlags(ventana_resultados.windowFlags() | Qt.WindowStaysOnTopHint)
+                        ventana_resultados.show()
+                        ventana_resultados.raise_()
+                        ventana_resultados.activateWindow()
+                        
+                        # Procesar eventos para asegurar que la ventana se muestre
+                        app = QApplication.instance()
+                        if app:
+                            app.processEvents()
+                        
+                        # Forzar el foco múltiples veces con procesamiento de eventos
+                        ventana_resultados.setWindowState(ventana_resultados.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
+                        ventana_resultados.raise_()
+                        ventana_resultados.activateWindow()
+                        
+                        if app:
+                            app.processEvents()
+                        
+                        # Quitar la bandera "always on top" después de mostrarse para comportamiento normal
+                        from PyQt5.QtCore import QTimer
+                        def quitar_always_on_top():
+                            ventana_resultados.setWindowFlags(ventana_resultados.windowFlags() & ~Qt.WindowStaysOnTopHint)
+                            ventana_resultados.show()
+                        
+                        QTimer.singleShot(1000, quitar_always_on_top)  # Quitar después de 1 segundo
+                        
+                        print(f"✓ Ventana DatosF abierta exitosamente con datos de: {worker.data_folder_final}")
+                        print(f"✓ CSV filtrado en: {worker.ruta_csv_generado if hasattr(worker, 'ruta_csv_generado') else 'No especificado'}")
+                        
+                        # Guardar referencia para evitar que se cierre automáticamente
+                        if not hasattr(app, '_ventana_resultados'):
+                            app._ventana_resultados = []
+                        app._ventana_resultados.append(ventana_resultados)
+                        
+                        # Actualizar resultado final con mensaje de éxito de DatosF
+                        resultado_final[0] = True
+                        resultado_final[1] = f"✓ Ventana DatosF abierta exitosamente con datos de: {worker.data_folder_final}"
+                        
+                        # Cerrar automáticamente la ventana de progreso después de un breve retraso
+                        from PyQt5.QtCore import QTimer
+                        def cerrar_ventana_progreso():
+                            print("Cerrando ventana de progreso automáticamente...")
+                            ventana_progreso.close()
+                        
+                        QTimer.singleShot(1500, cerrar_ventana_progreso)  # 1.5 segundos de retraso
+                        
+                    except Exception as e:
+                        print(f"ERROR al abrir ventana DatosF: {e}")
+                        import traceback
+                        traceback.print_exc()
+                else:
+                    print("No se pudo abrir DatosF:")
+                    print(f"  - Éxito: {exito}")
+                    print(f"  - Tiene data_folder_final: {hasattr(worker, 'data_folder_final')}")
+                    if hasattr(worker, 'data_folder_final'):
+                        print(f"  - Valor data_folder_final: {worker.data_folder_final}")
+                        
             resultado_final[0] = exito
             resultado_final[1] = mensaje
+            callback_ejecutado[0] = True  # Marcar que el callback terminó
         
         worker.analisis_terminado.connect(on_analisis_terminado)
         
         # Iniciar el worker
         worker.start()
         
-        # Mostrar ventana de progreso
-        ventana_progreso.exec_()
+        # Mostrar ventana de progreso y permitir que el análisis continúe
+        ventana_progreso.show()
         
-        # Esperar a que termine el worker
-        worker.wait()
+        # Procesar eventos mientras el worker ejecuta
+        while worker.isRunning():
+            app.processEvents()
+            if ventana_progreso.cancelado:
+                break
+        
+        # Asegurar que el worker termine limpiamente
+        if worker.isRunning():
+            worker.quit()
+            worker.wait(5000)  # Esperar máximo 5 segundos
+        
+        # Esperar a que el callback se ejecute completamente
+        timeout_counter = 0
+        while not callback_ejecutado[0] and timeout_counter < 50:  # Máximo 5 segundos
+            app.processEvents()
+            timeout_counter += 1
+            import time
+            time.sleep(0.1)
+        
+        print(f"=== RETORNANDO RESULTADO ===")
+        print(f"Callback ejecutado: {callback_ejecutado[0]}")
+        print(f"resultado_final[0]: {resultado_final[0]}")
+        print(f"resultado_final[1]: {resultado_final[1]}")
         
         return resultado_final[0], resultado_final[1]
         
