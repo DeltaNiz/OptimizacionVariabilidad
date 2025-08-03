@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QMainWindow, QApplication, QMessageBox, QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QTextEdit
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 import pandas as pd
 import sys
 import argparse
@@ -7,8 +7,38 @@ import os
 import subprocess
 from datetime import datetime
 import re
+import time
 import importlib.util
 import traceback
+
+class AppConstants:
+    """Clase centralizada para todas las constantes del proyecto"""
+    
+    # Constantes del proyecto
+    RUTA_BASE_PROYECTO = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion'
+    COLUMNAS_CSV = ['V', 'I', 'MV', 'MI']
+    EXTENSIONES_ARCHIVOS = {
+        'csv': '.csv',
+        'txt': '.txt',
+        'dat': '.dat'
+    }
+    
+    # Constantes de progreso
+    PROGRESO_BASE = 25  # Porcentaje base antes del procesamiento de estrellas
+    PROGRESO_ESTRELLAS = 75  # Porcentaje asignado al procesamiento de estrellas
+    
+    # Palabras clave para detección de fases
+    KEYWORDS_ARCHIVO = ["leyendo archivo", "archivo procesado", "gls", "pdm", "período"]
+    KEYWORDS_PROCESAMIENTO = ["procesando estrella", "analizando estrella"]
+    
+    # Patrones regex precompilados para mejor rendimiento
+    REGEX_PATTERNS = {
+        'total_estrellas': re.compile(r'Total de estrellas a procesar:\s*(\d+)'),
+        'procesando_estrella': re.compile(r'Procesando estrella (\d+)/(\d+)'),
+        'numero_estrella': re.compile(r'estrella[:\s]+(\d+)', re.IGNORECASE),
+        'archivo_estrella': re.compile(r'\b(\d+\.(txt|dat))\b'),
+        'archivo_numero': re.compile(r'\b\d+\.(txt|dat)\b')
+    }
 
 class VentanaProgreso(QDialog):
     def __init__(self, parent=None):
@@ -115,26 +145,18 @@ class VentanaProgreso(QDialog):
     def actualizar_progreso_estrellas(self, actual, total):
         """Actualiza el progreso específico de estrellas"""
         if total > 0:
-            # Progreso base: 25% (hasta el inicio del procesamiento de estrellas)
-            # Progreso de estrellas: 75% restante (25% a 100%)
-            progreso_base = 25
-            progreso_estrellas = 75
-            
-            # Calcular porcentaje de estrellas completadas
-            porcentaje_estrellas = (actual / total) * progreso_estrellas
-            porcentaje_total = progreso_base + porcentaje_estrellas
+            # Calcular porcentaje usando constantes
+            porcentaje_estrellas = (actual / total) * AppConstants.PROGRESO_ESTRELLAS
+            porcentaje_total = AppConstants.PROGRESO_BASE + porcentaje_estrellas
             
             self.progress_bar.setValue(int(porcentaje_total))
             
             # Determinar el texto del estado basado en si es completado o en progreso
             if actual == 0:
-                # Iniciando
                 self.label_estado.setText(f"Procesando estrella 0/{total}")
             elif actual == total:
-                # Todas completadas
                 self.label_estado.setText(f"Completadas {actual}/{total} estrellas")
             else:
-                # En progreso - mostrar la próxima a procesar
                 self.label_estado.setText(f"Procesando estrella {actual + 1}/{total}")
             
             # Mantener el label de progreso de estrellas vacío
@@ -143,12 +165,11 @@ class VentanaProgreso(QDialog):
         
     def actualizar_fase_analisis(self, fase, porcentaje_base=0):
         """Actualiza la fase del análisis con un porcentaje base"""
-        # Actualizar el estado normalmente, ya que actualizar_progreso_estrellas sobreescribirá cuando sea necesario
         self.label_estado.setText(fase)
         if porcentaje_base > 0:
             self.progress_bar.setValue(porcentaje_base)
             # Limpiar el label de progreso de estrellas solo en fases iniciales
-            if porcentaje_base < 25:  # Solo en las primeras fases
+            if porcentaje_base < AppConstants.PROGRESO_BASE:
                 self.label_progreso_estrellas.setText("")
         QApplication.processEvents()
         
@@ -212,23 +233,27 @@ class WorkerThread(QThread):
                 self.proceso_actual.terminate()
                 self.log_agregado.emit("Terminando proceso...")
                 
-                # Esperar un poco para terminación suave
-                import time
-                time.sleep(1)
-                
-                # Si aún está ejecutándose, forzar terminación
-                if self.proceso_actual.poll() is None:
-                    self.proceso_actual.kill()
-                    self.log_agregado.emit("Proceso terminado forzosamente")
-                else:
-                    self.log_agregado.emit("Proceso terminado correctamente")
+                # Usar QTimer en lugar de time.sleep para no bloquear la UI
+                QTimer.singleShot(1000, self._verificar_terminacion)
             except Exception as e:
                 self.log_agregado.emit(f"Error al terminar proceso: {e}")
-                try:
-                    self.proceso_actual.kill()
-                    self.log_agregado.emit("Proceso forzosamente terminado")
-                except:
-                    pass
+                self._forzar_terminacion()
+    
+    def _verificar_terminacion(self):
+        """Verifica si el proceso terminó suavemente, sino lo fuerza"""
+        if self.proceso_actual and self.proceso_actual.poll() is None:
+            self._forzar_terminacion()
+        else:
+            self.log_agregado.emit("Proceso terminado correctamente")
+    
+    def _forzar_terminacion(self):
+        """Fuerza la terminación del proceso"""
+        try:
+            if self.proceso_actual:
+                self.proceso_actual.kill()
+                self.log_agregado.emit("Proceso terminado forzosamente")
+        except:
+            pass
         
     def run(self):
         """Ejecuta el análisis en un hilo separado"""
@@ -239,7 +264,6 @@ class WorkerThread(QThread):
                 return
                 
             self.fase_analisis.emit("Ejecutando copiar.py...", 15)
-            self.log_agregado.emit("=== INICIANDO ANÁLISIS ===")
             self.log_agregado.emit("Ejecutando copiar.py...")
             
             # Primero generar CSV temporal para copiar.py
@@ -266,8 +290,7 @@ class WorkerThread(QThread):
             self.log_agregado.emit(f"Subcarpeta creada: data/{nombre_subcarpeta}")
             
             # Construir ruta completa de la carpeta de datos
-            ruta_base = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion'
-            data_folder = os.path.join(ruta_base, 'data', nombre_subcarpeta)
+            data_folder = os.path.join(AppConstants.RUTA_BASE_PROYECTO, 'data', nombre_subcarpeta)
             
             # Guardar la ruta para usar después del análisis
             self.data_folder_final = data_folder
@@ -316,30 +339,36 @@ class WorkerThread(QThread):
             self.log_agregado.emit(f"ERROR: {str(e)}")
             self.analisis_terminado.emit(False, f"Error inesperado: {str(e)}")
     
-    def generar_csv_temporal(self):
-        """Genera un archivo CSV temporal en la raíz del proyecto para copiar.py"""
+    def _generar_csv_base(self, ruta_destino):
+        """Función base para generar CSV con los datos filtrados"""
         try:
             # Crear DataFrame con los datos filtrados
             df = pd.DataFrame(self.datos_filtrados)
             
-            # Seleccionar solo las columnas V, I, MV, MI (sin Numero)
-            df = df[['V', 'I', 'MV', 'MI']]
+            # Seleccionar solo las columnas necesarias (sin Numero)
+            df = df[AppConstants.COLUMNAS_CSV]
             
+            # Guardar CSV sin cabeceras (header=False) y sin índice
+            df.to_csv(ruta_destino, index=False, header=False)
+            
+            return ruta_destino
+            
+        except Exception as e:
+            self.log_agregado.emit(f"Error al generar CSV: {str(e)}")
+            return None
+
+    def generar_csv_temporal(self):
+        """Genera un archivo CSV temporal en la raíz del proyecto para copiar.py"""
+        try:
             # Generar nombre del archivo con timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            nombre_archivo = f"datos_filtrados_{timestamp}.csv"
+            nombre_archivo = f"datos_filtrados_{timestamp}{AppConstants.EXTENSIONES_ARCHIVOS['csv']}"
             
             # Guardar en la raíz del proyecto (para copiar.py)
             directorio_actual = os.path.dirname(os.path.abspath(__file__))
             ruta_archivo = os.path.join(directorio_actual, nombre_archivo)
             
-            # Guardar CSV sin cabeceras (header=False) y sin índice
-            df.to_csv(ruta_archivo, index=False, header=False)
-            
-            self.log_agregado.emit(f"CSV temporal generado: {nombre_archivo}")
-            self.log_agregado.emit(f"Registros exportados: {len(self.datos_filtrados)}")
-            
-            return ruta_archivo
+            return self._generar_csv_base(ruta_archivo)
             
         except Exception as e:
             self.log_agregado.emit(f"Error al generar CSV temporal: {str(e)}")
@@ -353,29 +382,17 @@ class WorkerThread(QThread):
                 self.log_agregado.emit("Error: Carpeta de análisis no disponible")
                 return None
             
-            # Crear DataFrame con los datos filtrados
-            df = pd.DataFrame(self.datos_filtrados)
-            
-            # Seleccionar solo las columnas V, I, MV, MI (sin Numero)
-            df = df[['V', 'I', 'MV', 'MI']]
-            
             # Generar nombre del archivo con timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            nombre_archivo = f"datos_filtrados_{timestamp}.csv"
+            nombre_archivo = f"datos_filtrados_{timestamp}{AppConstants.EXTENSIONES_ARCHIVOS['csv']}"
             
-            # Guardar el CSV en la carpeta de análisis en lugar de la raíz del proyecto
+            # Guardar el CSV en la carpeta de análisis
             ruta_archivo = os.path.join(self.data_folder_final, nombre_archivo)
             
-            # Guardar CSV sin cabeceras (header=False) y sin índice
-            df.to_csv(ruta_archivo, index=False, header=False)
-            
-            self.log_agregado.emit(f"CSV generado: {nombre_archivo}")
-            self.log_agregado.emit(f"Registros exportados: {len(self.datos_filtrados)}")
-            
-            return ruta_archivo
+            return self._generar_csv_base(ruta_archivo)
             
         except Exception as e:
-            self.log_agregado.emit(f"Error al generar CSV: {str(e)}")
+            self.log_agregado.emit(f"Error al generar CSV automático: {str(e)}")
             return None
     
     def ejecutar_copiar_py(self, ruta_csv):
@@ -472,55 +489,51 @@ class WorkerThread(QThread):
                     linea = output.strip()
                     self.log_agregado.emit(linea)
                     
-                    # Detectar total de estrellas al inicio
+                    # Detectar total de estrellas al inicio usando regex precompilada
                     if "Total de estrellas a procesar:" in linea:
                         try:
-                            match = re.search(r'Total de estrellas a procesar:\s*(\d+)', linea)
+                            match = AppConstants.REGEX_PATTERNS['total_estrellas'].search(linea)
                             if match:
                                 total_estrellas = int(match.group(1))
                                 if not analisis_iniciado:
-                                    # Inicializar progreso inmediatamente con el total detectado
                                     self.progreso_estrellas.emit(0, total_estrellas)
                                     analisis_iniciado = True
                         except:
                             pass
                     
                     # Detectar progreso con formato "Procesando estrella X/Y"
-                    elif re.search(r'Procesando estrella (\d+)/(\d+)', linea):
+                    elif AppConstants.REGEX_PATTERNS['procesando_estrella'].search(linea):
                         try:
-                            match = re.search(r'Procesando estrella (\d+)/(\d+)', linea)
-                            if match:
-                                actual = int(match.group(1))
-                                total = int(match.group(2))
-                                total_estrellas = total
-                                
-                                # Actualizar usando la señal específica para estrellas - mostrar que está procesando
-                                # actual-1 porque representa estrellas completadas, no la que se está procesando
-                                self.progreso_estrellas.emit(actual - 1, total)
-                                analisis_iniciado = True
+                            match = AppConstants.REGEX_PATTERNS['procesando_estrella'].search(linea)
+                            actual = int(match.group(1))
+                            total = int(match.group(2))
+                            total_estrellas = total
+                            
+                            # actual-1 porque representa estrellas completadas, no la que se está procesando
+                            self.progreso_estrellas.emit(actual - 1, total)
+                            analisis_iniciado = True
                         except:
                             pass
                     
                     # Detectar estrella individual siendo procesada
-                    elif re.search(r'estrella[:\s]+(\d+)', linea, re.IGNORECASE):
+                    elif AppConstants.REGEX_PATTERNS['numero_estrella'].search(linea):
                         try:
-                            match = re.search(r'estrella[:\s]+(\d+)', linea, re.IGNORECASE)
-                            if match:
-                                numero_estrella = match.group(1)
-                                if "procesando" in linea.lower() or "analizando" in linea.lower():
-                                    self.detalle_cambiado.emit(f"Estrella actual: {numero_estrella}")
-                                    
-                                    # Si sabemos el total, actualizar progreso basado en el número de estrella
-                                    if total_estrellas > 0:
-                                        try:
-                                            estrella_num = int(numero_estrella)
-                                            # Calcular progreso basado en la estrella actual
-                                            estrellas_procesadas = max(1, estrella_num)  # Al menos 1
-                                            self.progreso_estrellas.emit(estrellas_procesadas, total_estrellas)
-                                        except:
-                                            pass
-                                elif "leyendo" in linea.lower() or "archivo" in linea.lower():
-                                    self.detalle_cambiado.emit(f"Leyendo datos estrella {numero_estrella}")
+                            match = AppConstants.REGEX_PATTERNS['numero_estrella'].search(linea)
+                            numero_estrella = match.group(1)
+                            if "procesando" in linea.lower() or "analizando" in linea.lower():
+                                self.detalle_cambiado.emit(f"Estrella actual: {numero_estrella}")
+                                
+                                # Si sabemos el total, actualizar progreso basado en el número de estrella
+                                if total_estrellas > 0:
+                                    try:
+                                        estrella_num = int(numero_estrella)
+                                        # Calcular progreso basado en la estrella actual
+                                        estrellas_procesadas = max(1, estrella_num)  # Al menos 1
+                                        self.progreso_estrellas.emit(estrellas_procesadas, total_estrellas)
+                                    except:
+                                        pass
+                            elif "leyendo" in linea.lower() or "archivo" in linea.lower():
+                                self.detalle_cambiado.emit(f"Leyendo datos estrella {numero_estrella}")
                         except:
                             pass
                     
@@ -571,7 +584,7 @@ class WorkerThread(QThread):
                         analisis_iniciado = True
                     
                     # Detectar cualquier indicador de que el procesamiento de estrellas ya comenzó
-                    elif any(keyword in linea.lower() for keyword in ["leyendo archivo", "archivo procesado", "gls", "pdm", "período"]) and total_estrellas > 0:
+                    elif any(keyword in linea.lower() for keyword in AppConstants.KEYWORDS_ARCHIVO) and total_estrellas > 0:
                         if not analisis_iniciado:
                             self.progreso_estrellas.emit(1, total_estrellas)
                             analisis_iniciado = True

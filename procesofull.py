@@ -23,8 +23,7 @@ def main():
         data = args.data_folder
     else:
         data = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion/data/analisis_20250722_180246'
-    
-    print(f"=== PROCESANDO ANÁLISIS DE ESTRELLAS ===")
+
     print(f"Carpeta de datos: {data}")
     print("-" * 50)
     

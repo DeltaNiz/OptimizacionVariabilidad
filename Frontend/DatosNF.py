@@ -12,6 +12,217 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Analisis import realizar_analisis_completo
 
+class AppConstants:
+    """Constantes centralizadas para la aplicación DatosNF"""
+    
+    # Configuraciones de pantalla
+    SCREEN_SMALL = 1366
+    SCREEN_MEDIUM = 1920
+    
+    # Dimensiones de ventana por tipo de pantalla
+    WINDOW_SMALL = (1133, 600)
+    WINDOW_MEDIUM = (1113, 800)
+    WINDOW_LARGE = (1600, 1000)
+    
+    # Headers de tablas
+    TABLE_MAIN_HEADERS = ["N°", "V", "I", "MV", "MI", "Desc."]
+    TABLE_DESCARTADAS_HEADERS = ["N°", "V", "I", "MV", "MI"]
+    
+    # Configuraciones de columnas - Tabla Principal
+    COL_WIDTH_MAIN = {
+        0: 48,   # N°
+        1: 130,  # V
+        2: 130,  # I
+        3: 130,  # MV
+        4: 130,  # MI
+        5: 62    # Desc.
+    }
+    
+    # Configuraciones de columnas - Tabla Descartadas
+    COL_WIDTH_DESC = {
+        0: 53,   # N°
+        1: 84,   # V
+        2: 84,   # I
+        3: 84,   # MV
+        4: 84    # MI
+    }
+    
+    # Alturas de filas
+    ROW_HEIGHT_MAIN = 30
+    ROW_HEIGHT_DESC = 28
+    
+    # Colores del tema
+    COLOR_VERDE_PRINCIPAL = "#a7c942"
+    COLOR_VERDE_HOVER = "#98b83b"
+    COLOR_VERDE_PRESSED = "#7a9530"
+    COLOR_VERDE_BORDER = "#98b83b"
+    COLOR_ROJO_PRINCIPAL = "#d9534f"
+    COLOR_ROJO_HOVER = "#c9302c"
+    COLOR_ROJO_PRESSED = "#ac2925"
+    COLOR_AMARILLO_MARCA = "#ffff96"  # Color para marcar filas
+    
+    # Textos de información
+    PREFIJO_ARCHIVO = "Archivo"
+    LABEL_TOTAL_ESTRELLAS = "Total estrellas"
+    LABEL_DESCARTADAS = "Descartadas"
+    TEXTO_SIN_ARCHIVO = "Sin archivo cargado"
+    LABEL_ESTRELLAS_DISPONIBLES = "Estrellas disponibles"
+    LABEL_ESTRELLAS_SELECCIONADAS = "Estrellas seleccionadas"
+    
+    # Estilos de fuente
+    FUENTE_INFORMACION = "font-size: 11px; color: #333333;"
+    FUENTE_TITULO = "QLabel { font-size: 16px; font-weight: bold; }"
+    FUENTE_SUBTITULO = "QLabel { font-size: 12px; }"
+
+class StyleSheets:
+    """Estilos CSS centralizados para la aplicación"""
+    
+    HEADER_TABLE = f"""
+        QHeaderView::section {{ 
+            background-color: {AppConstants.COLOR_VERDE_PRINCIPAL}; 
+            color: white; 
+            font-weight: bold;
+            border: 1px solid {AppConstants.COLOR_VERDE_BORDER};
+            padding: 5px;
+            text-align: center;
+            border-style: solid;
+            border-top: none;
+            border-left: none;
+            border-right: 1px solid {AppConstants.COLOR_VERDE_BORDER};
+            border-bottom: 1px solid {AppConstants.COLOR_VERDE_BORDER};
+        }}
+        QHeaderView::section:hover {{
+            background-color: {AppConstants.COLOR_VERDE_PRINCIPAL};
+        }}
+        QHeaderView::section:pressed {{
+            background-color: {AppConstants.COLOR_VERDE_PRINCIPAL};
+        }}
+    """
+    
+    TABLE_MAIN = f"""
+        QTableWidget {{
+            gridline-color: {AppConstants.COLOR_VERDE_PRINCIPAL};
+            background-color: white;
+            alternate-background-color: #f0f0f0;
+            margin: 10px;
+        }}
+        QTableWidget::item {{
+            border: 1px solid {AppConstants.COLOR_VERDE_PRINCIPAL};
+        }}
+        QTableWidget::item:selected {{
+            background-color: {AppConstants.COLOR_VERDE_HOVER};
+            color: white;
+        }}
+    """
+    
+    INPUT_FIELD = f"""
+        QLineEdit {{
+            padding: 5px 8px;
+            border: 1px solid {AppConstants.COLOR_VERDE_PRINCIPAL};
+            border-radius: 4px;
+            background-color: white;
+            font-size: 12px;
+        }}
+        QLineEdit:focus {{
+            border: 2px solid {AppConstants.COLOR_VERDE_HOVER};
+        }}
+        QLineEdit::placeholder {{
+            color: #888;
+            font-style: italic;
+        }}
+    """
+    
+    BUTTON_PRIMARY = f"""
+        QPushButton {{
+            font-size: 12px;
+            color: white;
+            font-weight: bold;
+            background-color: {AppConstants.COLOR_VERDE_PRINCIPAL};
+            border: none;
+            padding: 5px 20px;
+            border-radius: 8px;
+        }}
+        QPushButton:hover {{
+            background-color: {AppConstants.COLOR_VERDE_HOVER};
+        }}
+        QPushButton:pressed {{
+            background-color: {AppConstants.COLOR_VERDE_PRESSED};
+        }}
+    """
+    
+    BUTTON_DANGER = f"""
+        QPushButton {{
+            font-size: 12px;
+            color: white;
+            font-weight: bold;
+            background-color: red;
+            border: none;
+            padding: 5px 20px;
+            border-radius: 8px;
+        }}
+        QPushButton:hover {{
+            background-color: #8a0000;
+        }}
+        QPushButton:pressed {{
+            background-color: {AppConstants.COLOR_VERDE_PRESSED};
+        }}
+    """
+    
+    BUTTON_SECONDARY = f"""
+        QPushButton {{
+            font-size: 11px;
+            color: white;
+            font-weight: bold;
+            background-color: {AppConstants.COLOR_ROJO_PRINCIPAL};
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }}
+        QPushButton:hover {{
+            background-color: {AppConstants.COLOR_ROJO_HOVER};
+        }}
+        QPushButton:pressed {{
+            background-color: {AppConstants.COLOR_ROJO_PRESSED};
+        }}
+    """
+    
+    BUTTON_SMALL = f"""
+        QPushButton {{
+            font-size: 11px;
+            color: white;
+            font-weight: bold;
+            background-color: {AppConstants.COLOR_VERDE_PRINCIPAL};
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }}
+        QPushButton:hover {{
+            background-color: {AppConstants.COLOR_VERDE_HOVER};
+        }}
+        QPushButton:pressed {{
+            background-color: {AppConstants.COLOR_VERDE_PRESSED};
+        }}
+    """
+    
+    CHECKBOX = f"""
+        QCheckBox::indicator {{
+            width: 18px;
+            height: 18px;
+        }}
+        QCheckBox::indicator:unchecked {{
+            border: 2px solid {AppConstants.COLOR_VERDE_PRINCIPAL};
+            background-color: white;
+            border-radius: 3px;
+        }}
+        QCheckBox::indicator:checked {{
+            border: 2px solid {AppConstants.COLOR_VERDE_PRINCIPAL};
+            background-color: {AppConstants.COLOR_VERDE_PRINCIPAL};
+            border-radius: 3px;
+        }}
+    """
+    
+    SEPARATOR = f"QFrame {{ color: {AppConstants.COLOR_VERDE_PRINCIPAL}; }}"
+
 class DatosNF(QMainWindow):
     def __init__(self, datos_formulario=None, ventana_subir=None, ventana_main=None):
         super().__init__()
@@ -23,401 +234,260 @@ class DatosNF(QMainWindow):
         self.init_ui()
     
     def init_ui(self):
+        """Inicializa la interfaz de usuario de manera modular"""
         self.setWindowTitle("Optim. Estrellas")
-        screen_width = self.screen().size().width()
-        # Lógica similar a media queries
-        if screen_width <= 1366:  # Pantallas pequeñas/laptops
-            self.resize(1133, 600)
-            self.setWindowTitle("Nombre de Aplicación - Pantalla Pequeña")
-            layout_margin = 10  # Márgenes pequeños para pantallas pequeñas
-            print(f"Configuración aplicada: Pantalla pequeña - Ventana: {self.width()}x{self.height()}")
-        elif screen_width <= 1920:  # Pantallas medianas/Full HD
-            self.resize(1113, 800)
-            self.setWindowTitle("Nombre de Aplicación - Pantalla Mediana")
-            layout_margin = 5  # Márgenes medianos
-            print(f"Configuración aplicada: Pantalla mediana - Ventana: {self.width()}x{self.height()}")
-        else:  # Pantallas grandes/4K
-            self.resize(1600, 1000)
-            self.setWindowTitle("Nombre de Aplicación - Pantalla Grande")
-            layout_margin = 20  # Márgenes grandes para pantallas grandes
-            print(f"Configuración aplicada: Pantalla grande - Ventana: {self.width()}x{self.height()}")
-
-        # Widget central
+        
+        # Configuración responsiva de pantalla
+        layout_margin = self._configure_screen_layout()
+        
+        # Widget central y layout principal
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-
-        # Layout principal horizontal
         main_layout = QHBoxLayout()
-        
-        # Añadir márgenes internos al layout principal (dinámicos según tamaño de pantalla)
         main_layout.setContentsMargins(layout_margin, layout_margin, layout_margin, layout_margin)
-        main_layout.setSpacing(layout_margin + 5)  # Espacio entre tabla y columna derecha
+        main_layout.setSpacing(layout_margin + 5)
+        
+        # Configurar tabla principal
+        self._setup_main_table()
+        
+        # Cargar datos
+        self.cargar_datos_tabla()
+        
+        # Configurar panel derecho
+        right_layout = self._setup_right_panel()
+        
+        # Crear separador vertical
+        separator = self._create_vertical_separator()
+        
+        # Ensamblar layout principal
+        main_layout.addWidget(self.table_main, 13)
+        main_layout.addWidget(separator, 0)
+        main_layout.addLayout(right_layout, 8)
+        
+        central_widget.setLayout(main_layout)
+        
+        # Instalar filtros de eventos
+        self.installEventFilter(self)
+        
+        # Actualizar información final
+        self.actualizar_info_estrellas()
 
-        # --- Tabla principal ---
+    def _configure_screen_layout(self):
+        """Configura el layout según el tamaño de pantalla"""
+        screen_width = self.screen().size().width()
+        
+        if screen_width <= AppConstants.SCREEN_SMALL:
+            self.resize(*AppConstants.WINDOW_SMALL)
+            self.setWindowTitle("Optim. Estrellas - Pantalla Pequeña")
+            layout_margin = 10
+            print(f"Configuración aplicada: Pantalla pequeña - Ventana: {self.width()}x{self.height()}")
+        elif screen_width <= AppConstants.SCREEN_MEDIUM:
+            self.resize(*AppConstants.WINDOW_MEDIUM)
+            self.setWindowTitle("Optim. Estrellas - Pantalla Mediana")
+            layout_margin = 5
+            print(f"Configuración aplicada: Pantalla mediana - Ventana: {self.width()}x{self.height()}")
+        else:
+            self.resize(*AppConstants.WINDOW_LARGE)
+            self.setWindowTitle("Optim. Estrellas - Pantalla Grande")
+            layout_margin = 20
+            print(f"Configuración aplicada: Pantalla grande - Ventana: {self.width()}x{self.height()}")
+        
+        return layout_margin
+
+    def _setup_main_table(self):
+        """Configura la tabla principal con estilos optimizados"""
         self.table_main = QTableWidget()
-        self.table_main.setRowCount(0)  # Iniciar vacía
-        self.table_main.setColumnCount(6)  # Ahora son 6 columnas
-        self.table_main.setHorizontalHeaderLabels(["N°", "V", "I", "MV", "MI", "Desc."])
-
-        # Ocultar la numeración automática de filas
+        self.table_main.setRowCount(0)
+        self.table_main.setColumnCount(len(AppConstants.TABLE_MAIN_HEADERS))
+        self.table_main.setHorizontalHeaderLabels(AppConstants.TABLE_MAIN_HEADERS)
+        
+        # Ocultar numeración automática de filas
         self.table_main.verticalHeader().setVisible(False)
         
-        # Instalar filtro de eventos para limpiar selección al hacer clic fuera de la tabla
+        # Instalar filtros de eventos
         self.table_main.viewport().installEventFilter(self)
-        
-        # Conectar evento para seleccionar fila completa al hacer clic en primera columna
         self.table_main.itemClicked.connect(self.on_table_main_item_clicked)
         
-        # Set green background color for header cells
+        # Aplicar estilos centralizados
         header = self.table_main.horizontalHeader()
-        header.setStyleSheet("""
-            QHeaderView::section { 
-                background-color: #a7c942; 
-                color: white; 
-                font-weight: bold;
-                border: 1px solid #98b83b;
-                padding: 5px;
-                text-align: center;
-                border-style: solid;
-                border-top: none;
-                border-left: none;
-                border-right: 1px solid #98b83b;
-                border-bottom: 1px solid #98b83b;
-            }
-            QHeaderView::section:hover {
-                background-color: #a7c942;  /* Sin cambio en hover */
-            }
-            QHeaderView::section:pressed {
-                background-color: #a7c942;  /* Sin cambio al presionar */
-            }
-        """)
+        header.setStyleSheet(StyleSheets.HEADER_TABLE)
+        self.table_main.setStyleSheet(StyleSheets.TABLE_MAIN)
         
-        # Personalizar color de las líneas de la tabla y colores alternados
-        self.table_main.setStyleSheet("""
-            QTableWidget {
-                gridline-color: #a7c942;  /* Color verde para las líneas */
-                background-color: white;
-                alternate-background-color: #f0f0f0;  /* Color verde claro alternado */
-            }
-            QTableWidget::item {
-                border: 1px solid #a7c942;  /* Bordes verdes en cada celda */
-            }
-            QTableWidget::item:selected {
-                background-color: #98b83b;  /* Color verde cuando se selecciona una celda */
-                color: white;  /* Texto blanco en selección */
-            }
-        """)
-        
-        # Activar colores alternados en las filas
+        # Configurar colores alternados y dimensiones
         self.table_main.setAlternatingRowColors(True)
+        self.table_main.verticalHeader().setDefaultSectionSize(AppConstants.ROW_HEIGHT_MAIN)
         
-        # Controlar ancho de columnas
-        self.table_main.setColumnWidth(0, 48)   # Columna N° - 25px
-        self.table_main.setColumnWidth(1, 130)   # Columna V - 130px
-        self.table_main.setColumnWidth(2, 130)   # Columna I - 130px
-        self.table_main.setColumnWidth(3, 130)   # Columna MV - 130px
-        self.table_main.setColumnWidth(4, 130)   # Columna MI - 130px
-        self.table_main.setColumnWidth(5, 62)   # Columna Desc. - 62px
+        # Configurar anchos de columnas
+        for col, width in AppConstants.COL_WIDTH_MAIN.items():
+            self.table_main.setColumnWidth(col, width)
 
-        # Controlar altura de filas
-        self.table_main.verticalHeader().setDefaultSectionSize(30)  # 30px de alto
-        
-        # Añadir márgenes específicos a la tabla principal usando CSS
-        self.table_main.setStyleSheet(self.table_main.styleSheet() + """
-            QTableWidget {
-                margin: 10px;  /* Margen de 10px en todos los lados */
-            }
-        """)
-
-        # Cargar datos del CSV si está disponible, sino usar datos de ejemplo
-        self.cargar_datos_tabla()
-
-
+    def _setup_right_panel(self):
+        """Configura el panel derecho completo"""
         right_layout = QVBoxLayout()
+        right_layout.setContentsMargins(10, 10, 10, 10)
+        right_layout.setSpacing(10)
         
-        # Añadir márgenes internos al layout derecho
-        right_layout.setContentsMargins(10, 10, 10, 10)  # Márgenes internos
-        right_layout.setSpacing(10)  # Espacio entre elementos del layout derecho
+        # Título y subtítulo
+        self._setup_header_labels(right_layout)
+        
+        # Separador
+        right_layout.addSpacing(8)
+        right_layout.addWidget(self._create_horizontal_separator())
+        right_layout.addSpacing(10)
+        
+        # Tabla de descartadas
+        self._setup_descartadas_table(right_layout)
+        
+        # Botón limpiar
+        self._setup_clear_button(right_layout)
+        
+        # Separador
+        right_layout.addWidget(self._create_horizontal_separator())
+        right_layout.addSpacing(10)
+        
+        # Controles de rango
+        self._setup_range_controls(right_layout)
+        
+        # Separador
+        right_layout.addSpacing(10)
+        right_layout.addWidget(self._create_horizontal_separator())
+        right_layout.addSpacing(10)
+        
+        # Botones de acción
+        self._setup_action_buttons(right_layout)
+        right_layout.addSpacing(10)
+        
+        return right_layout
 
+    def _setup_header_labels(self, layout):
+        """Configura las etiquetas de encabezado"""
         label_title = QLabel("<b>Datos Cargados Correctamente</b>")
         label_title.setAlignment(Qt.AlignCenter)
-        label_title.setStyleSheet(""" QLabel { font-size: 16px;  /* Tamaño de texto dinámico */ font-weight: bold; }""")
+        label_title.setStyleSheet(AppConstants.FUENTE_TITULO)
         
-        # Mostrar información de los datos del formulario si están disponibles
+        # Mostrar información del formulario si está disponible
         if self.datos_formulario:
             info_formulario = self.crear_info_formulario()
             label_title.setText(f"<b>Datos Cargados Correctamente</b><br><small>{info_formulario}</small>")
         
         label_subtitle = QLabel("Seleccione una estrella de la lista para descartarla")
         label_subtitle.setAlignment(Qt.AlignCenter)
-        label_subtitle.setStyleSheet(""" QLabel { font-size: 12px;  /* Tamaño de texto dinámico */}""")
+        label_subtitle.setStyleSheet(AppConstants.FUENTE_SUBTITULO)
+        
+        # Etiqueta dinámica para información de estrellas
+        self.label_descartadas = QLabel("<b>Estrellas descartadas: 0</b>")
+        self.label_descartadas.setAlignment(Qt.AlignCenter)
+        
+        layout.addWidget(label_title)
+        layout.addWidget(label_subtitle)
 
-        # Etiqueta dinámica para mostrar información de estrellas
-        self.label_descartadas = QLabel("<b>Estrellas descartadas: 3</b>")
-        # No llamar actualizar_info_estrellas() aquí todavía
-
-        # --- Layout horizontal para rango de números (estilo Excel) ---
-        range_layout = QHBoxLayout()
+    def _setup_descartadas_table(self, layout):
+        """Configura la tabla de estrellas descartadas"""
+        layout.addWidget(self.label_descartadas)
         
-        # Etiqueta del rango
-        label_rango = QLabel("<b>Rango de descarte:</b>")
-
-        # Campo de texto para rangos múltiples
-        self.input_rangos = QLineEdit()
-        self.input_rangos.setPlaceholderText("Ej: 1-5, 8, 10-15, 20-25")
-        self.input_rangos.setStyleSheet("""
-            QLineEdit {
-                padding: 5px 8px;
-                border: 1px solid #a7c942;
-                border-radius: 4px;
-                background-color: white;
-                font-size: 12px;
-            }
-            QLineEdit:focus {
-                border: 2px solid #98b83b;
-            }
-            QLineEdit::placeholder {
-                color: #888;
-                font-style: italic;
-            }
-        """)
-        
-        # Botón para aplicar rangos
-        btn_aplicar_rangos = QPushButton("Aplicar")
-        btn_aplicar_rangos.setMaximumWidth(70)
-        btn_aplicar_rangos.setCursor(QCursor(Qt.PointingHandCursor))
-        btn_aplicar_rangos.setStyleSheet("""
-            QPushButton {
-                font-size: 11px;
-                color: white;
-                font-weight: bold;
-                background-color: #a7c942;
-                border: none;
-                padding: 5px 10px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #98b83b;
-            }
-            QPushButton:pressed {
-                background-color: #7a9530;
-            }
-        """)
-        
-        # Agregar widgets al layout horizontal
-        range_layout.addWidget(label_rango)
-        range_layout.addWidget(self.input_rangos, 1)  # El input ocupa el espacio disponible
-        range_layout.addWidget(btn_aplicar_rangos)
-        
-        # Conectar evento del botón
-        btn_aplicar_rangos.clicked.connect(self.aplicar_rangos)
-        
-        # También permitir aplicar con Enter
-        self.input_rangos.returnPressed.connect(self.aplicar_rangos)
-
         self.table_descartadas = QTableWidget()
-        self.table_descartadas.setRowCount(0)  # Iniciar vacía
-        self.table_descartadas.setColumnCount(5)
-        self.table_descartadas.setHorizontalHeaderLabels(["N°", "V", "I", "MV", "MI"])
-
-        # Ocultar la numeración automática de filas
+        self.table_descartadas.setRowCount(0)
+        self.table_descartadas.setColumnCount(len(AppConstants.TABLE_DESCARTADAS_HEADERS))
+        self.table_descartadas.setHorizontalHeaderLabels(AppConstants.TABLE_DESCARTADAS_HEADERS)
+        
+        # Configurar eventos y estilos
         self.table_descartadas.verticalHeader().setVisible(False)
-        
-        # Instalar filtro de eventos para limpiar selección al hacer clic fuera de la tabla
         self.table_descartadas.viewport().installEventFilter(self)
-        
-        # Conectar evento para seleccionar fila completa al hacer clic en primera columna
         self.table_descartadas.itemClicked.connect(self.on_table_descartadas_item_clicked)
-
+        
+        # Aplicar estilos
         header_descartadas = self.table_descartadas.horizontalHeader()
-        header_descartadas.setStyleSheet("""
-            QHeaderView::section { 
-                background-color: #a7c942; 
-                color: white; 
-                font-weight: bold;
-                border: 1px solid #98b83b;
-                padding: 5px;
-                text-align: center;
-                border-style: solid;
-                border-top: none;
-                border-left: none;
-                border-right: 1px solid #98b83b;
-                border-bottom: 1px solid #98b83b;
-            }
-            QHeaderView::section:hover {
-                background-color: #a7c942;  /* Sin cambio en hover */
-            }
-            QHeaderView::section:pressed {
-                background-color: #a7c942;  /* Sin cambio al presionar */
-            }
-        """)
-        
-        # Personalizar color de las líneas de la tabla descartadas y colores alternados
-        self.table_descartadas.setStyleSheet("""
-            QTableWidget {
-                gridline-color: #a7c942;  /* Color verde para las líneas */
-                background-color: white;
-                alternate-background-color: #f0f0f0;  /* Color verde claro alternado */
-            }
-            QTableWidget::item {
-                border: 1px solid #a7c942;  /* Bordes verdes en cada celda */
-            }
-            QTableWidget::item:selected {
-                background-color: #98b83b;  /* Color verde cuando se selecciona una celda */
-                color: white;  /* Texto blanco en selección */
-            }
-        """)
-        
-        # Activar colores alternados en las filas para tabla descartadas
+        header_descartadas.setStyleSheet(StyleSheets.HEADER_TABLE)
+        self.table_descartadas.setStyleSheet(StyleSheets.TABLE_MAIN)
         self.table_descartadas.setAlternatingRowColors(True)
+        self.table_descartadas.verticalHeader().setDefaultSectionSize(AppConstants.ROW_HEIGHT_DESC)
         
-        # Controlar ancho de columnas para tabla descartadas
-        self.table_descartadas.setColumnWidth(0, 53)   # Columna N° - 53px
-        self.table_descartadas.setColumnWidth(1, 84)   # Columna V - 84px
-        self.table_descartadas.setColumnWidth(2, 84)   # Columna I - 84px
-        self.table_descartadas.setColumnWidth(3, 84)   # Columna MV - 84px
-        self.table_descartadas.setColumnWidth(4, 84)   # Columna MI - 84px
-
-        # Controlar altura de filas para tabla descartadas
-        self.table_descartadas.verticalHeader().setDefaultSectionSize(28)  # 28px de alto
-
-        btn_descartar = QPushButton("Descartar Datos")
-        btn_descartar.clicked.connect(self.abrir_ventana_main)  # Conectar al método personalizado
-        btn_descartar.setCursor(QCursor(Qt.PointingHandCursor))
-        # Controlar el tamaño del botón para que no ocupe todo el ancho
-        btn_descartar.setSizePolicy(btn_descartar.sizePolicy().horizontalPolicy(), btn_descartar.sizePolicy().verticalPolicy())
-        btn_descartar.setMaximumWidth(200)  # Ancho máximo de 200px
-        btn_descartar.setStyleSheet("""
-            QPushButton {
-                font-size: 12px;
-                color: white;
-                font-weight: bold;
-                background-color: red;  /* Rojo para el botón de descartar */
-                border: none;
-                padding: 5px 20px;
-                border-radius: 8px;
-            }
-            QPushButton:hover {
-                background-color: #8a0000;  /* Rojo más oscuro al pasar el mouse */
-            }
-            QPushButton:pressed {
-                background-color: #7a9530;
-            }
-        """)
-
-        btn_analisis = QPushButton("Realizar Análisis")
-        btn_analisis.clicked.connect(self.realizar_analisis)  # Conectar al método de análisis
-        btn_analisis.setCursor(QCursor(Qt.PointingHandCursor))
-        # Controlar el tamaño del botón para que no ocupe todo el ancho
-        btn_analisis.setMaximumWidth(200)  # Ancho máximo de 200px
-        btn_analisis.setStyleSheet("""
-            QPushButton {
-                font-size: 12px;
-                color: white;
-                font-weight: bold;
-                background-color: #a7c942;
-                border: none;
-                padding: 5px 20px;
-                border-radius: 8px;
-            }
-            QPushButton:hover {
-                background-color: #98b83b;
-            }
-            QPushButton:pressed {
-                background-color: #7a9530;
-            }
-        """)
-
-        # Agregar widgets a layout derecho
-        right_layout.addWidget(label_title)
-        right_layout.addWidget(label_subtitle)
-        right_layout.addSpacing(8)  # Espacio entre subtítulo y separador
+        # Configurar anchos de columnas
+        for col, width in AppConstants.COL_WIDTH_DESC.items():
+            self.table_descartadas.setColumnWidth(col, width)
         
-        # Crear separador horizontal
-        right_layout.addWidget(self.separador_horizontal())
+        layout.addWidget(self.table_descartadas)
 
-        right_layout.addSpacing(10)  # Espacio entre separador y "Estrellas descartadas"
-
-        right_layout.addWidget(self.label_descartadas)
-        right_layout.addWidget(self.table_descartadas)
-
-        # Botón para limpiar selecciones (entre tabla y rangos)
-        btn_limpiar = QPushButton("Limpiar Selecciones")
+    def _setup_clear_button(self, layout):
+        """Configura el botón de limpiar selecciones"""
+        btn_limpiar = self._create_button("Limpiar Selecciones", StyleSheets.BUTTON_SECONDARY, self.limpiar_selecciones)
         btn_limpiar.setMaximumWidth(150)
-        btn_limpiar.setCursor(QCursor(Qt.PointingHandCursor))
-        btn_limpiar.setStyleSheet("""
-            QPushButton {
-                font-size: 11px;
-                color: white;
-                font-weight: bold;
-                background-color: #d9534f;
-                border: none;
-                padding: 5px 10px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #c9302c;
-            }
-            QPushButton:pressed {
-                background-color: #ac2925;
-            }
-        """)
-        btn_limpiar.clicked.connect(self.limpiar_selecciones)
         
-        # Crear layout para centrar el botón limpiar
+        # Layout para centrar el botón
         limpiar_layout = QHBoxLayout()
         limpiar_layout.addStretch()
         limpiar_layout.addWidget(btn_limpiar)
         limpiar_layout.addStretch()
         
-        right_layout.addLayout(limpiar_layout)
+        layout.addLayout(limpiar_layout)
 
-        #separador horizontal debajo de la tabla descartadas
-        right_layout.addWidget(self.separador_horizontal())
-
-        # separacion entre tabla y rango
-        right_layout.addSpacing(10)  # Espacio entre tabla y rango
+    def _setup_range_controls(self, layout):
+        """Configura los controles de rango"""
+        # Etiqueta del rango
+        label_rango = QLabel("<b>Rango de descarte:</b>")
+        layout.addWidget(label_rango)
         
-        # Agregar etiqueta y layout de rango DEBAJO de la tabla
-        right_layout.addWidget(label_rango)
-        right_layout.addLayout(range_layout)
-
-        #separacion entre rango y separador
-        right_layout.addSpacing(10)  # Espacio entre rango y separador
-
-        #separador horizontal debajo del rango
-        right_layout.addWidget(self.separador_horizontal())
-
-        # separacion entre rango y botones
-        right_layout.addSpacing(10)  # Espacio entre rango y botones
+        # Layout horizontal para controles
+        range_layout = QHBoxLayout()
         
-        # Crear layout horizontal para ambos botones (lado a lado)
+        # Campo de texto para rangos
+        self.input_rangos = QLineEdit()
+        self.input_rangos.setPlaceholderText("Ej: 1-5, 8, 10-15, 20-25")
+        self.input_rangos.setStyleSheet(StyleSheets.INPUT_FIELD)
+        self.input_rangos.returnPressed.connect(self.aplicar_rangos)
+        
+        # Botón aplicar
+        btn_aplicar_rangos = self._create_button("Aplicar", StyleSheets.BUTTON_SMALL, self.aplicar_rangos)
+        btn_aplicar_rangos.setMaximumWidth(70)
+        
+        # Ensamblar layout
+        range_layout.addWidget(label_rango)
+        range_layout.addWidget(self.input_rangos, 1)
+        range_layout.addWidget(btn_aplicar_rangos)
+        
+        layout.addLayout(range_layout)
+
+    def _setup_action_buttons(self, layout):
+        """Configura los botones de acción principales"""
+        btn_descartar = self._create_button("Descartar Datos", StyleSheets.BUTTON_DANGER, self.abrir_ventana_main)
+        btn_descartar.setMaximumWidth(200)
+        
+        btn_analisis = self._create_button("Realizar Análisis", StyleSheets.BUTTON_PRIMARY, self.realizar_analisis)
+        btn_analisis.setMaximumWidth(200)
+        
+        # Layout horizontal para botones
         buttons_layout = QHBoxLayout()
-        buttons_layout.addStretch()  # Espacio flexible a la izquierda
+        buttons_layout.addStretch()
         buttons_layout.addWidget(btn_descartar)
-        buttons_layout.addSpacing(10)  # Espacio pequeño entre botones
+        buttons_layout.addSpacing(10)
         buttons_layout.addWidget(btn_analisis)
-        buttons_layout.addStretch()  # Espacio flexible a la derecha
+        buttons_layout.addStretch()
         
-        right_layout.addLayout(buttons_layout)
-        right_layout.addSpacing(10)  # Espacio entre botones y borde inferior
-        
-        # Crear separador vertical
-        separator = self.separador_vertical()
-        
-        # para evitar que la tabla principal ocupe todo el ancho
-        main_layout.addWidget(self.table_main, 13)      # Peso 7 (tabla principal)
-        main_layout.addWidget(separator, 0)            # Peso 0 (separador)
-        main_layout.addLayout(right_layout, 8)         # Peso 5 (layout derecho)
+        layout.addLayout(buttons_layout)
 
-        central_widget.setLayout(main_layout)
-        
-        # Instalar filtro de eventos en la ventana principal para limpiar selecciones
-        # al hacer clic fuera de las tablas
-        self.installEventFilter(self)
-        
-        # Actualizar la información de estrellas ahora que todos los widgets están creados
-        self.actualizar_info_estrellas()
+    def _create_button(self, text, style, callback):
+        """Crea un botón con estilo y configuración consistente"""
+        button = QPushButton(text)
+        button.setCursor(QCursor(Qt.PointingHandCursor))
+        button.setStyleSheet(style)
+        button.clicked.connect(callback)
+        return button
+
+    def _create_horizontal_separator(self):
+        """Crea un separador horizontal personalizado"""
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setLineWidth(1)
+        separator.setStyleSheet(StyleSheets.SEPARATOR)
+        return separator
+
+    def _create_vertical_separator(self):
+        """Crea un separador vertical personalizado"""
+        separator = QFrame()
+        separator.setFrameShape(QFrame.VLine)
+        separator.setLineWidth(1)
+        separator.setStyleSheet(StyleSheets.SEPARATOR)
+        return separator
 
     def eventFilter(self, source, event):
         """Filtro de eventos para limpiar selecciones al hacer clic fuera de las tablas"""
@@ -445,22 +515,6 @@ class DatosNF(QMainWindow):
         
         return super().eventFilter(source, event)
     
-    def separador_horizontal(self):
-        """Crea un separador horizontal personalizado"""
-        separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setLineWidth(1)
-        separator.setStyleSheet("QFrame { color: #a7c942; }")  # Color verde
-        return separator
-
-    def separador_vertical(self):
-        """Crea un separador vertical personalizado"""
-        separator = QFrame()
-        separator.setFrameShape(QFrame.VLine)
-        separator.setLineWidth(1)
-        separator.setStyleSheet("QFrame { color: #a7c942; }")
-        return separator
-
     def on_table_main_item_clicked(self, item):
         """Maneja el clic en celdas de la tabla principal"""
         if item.column() == 0:  # Si se hizo clic en la primera columna (N°)
@@ -564,20 +618,11 @@ class DatosNF(QMainWindow):
 
     def limpiar_selecciones(self):
         """Limpia todas las selecciones: checkboxes, marcas visuales y tabla de descartadas"""
-        # Limpiar marcas visuales
-        for row in range(self.table_main.rowCount()):
-            for col in range(self.table_main.columnCount() - 1):  # Excluir la columna de checkboxes
-                item = self.table_main.item(row, col)
-                if item:
-                    item.setBackground(Qt.white)  # Restablecer color de fondo
+        # Limpiar marcas visuales usando método optimizado
+        self._limpiar_marcas_visuales()
         
         # Desactivar todos los checkboxes
-        for row in range(self.table_main.rowCount()):
-            checkbox_widget = self.table_main.cellWidget(row, 5)
-            if checkbox_widget:
-                checkbox = checkbox_widget.findChild(QCheckBox)
-                if checkbox and checkbox.isChecked():
-                    checkbox.setChecked(False)  # Esto automáticamente quitará de la tabla de descartadas
+        self._desactivar_todos_checkboxes()
         
         # Limpiar el campo de texto de rangos
         self.input_rangos.clear()
@@ -586,6 +631,15 @@ class DatosNF(QMainWindow):
         self.actualizar_info_estrellas()
         
         print("Todas las selecciones han sido limpiadas")
+
+    def _desactivar_todos_checkboxes(self):
+        """Desactiva todos los checkboxes de la tabla principal"""
+        for row in range(self.table_main.rowCount()):
+            checkbox_widget = self.table_main.cellWidget(row, 5)
+            if checkbox_widget:
+                checkbox = checkbox_widget.findChild(QCheckBox)
+                if checkbox and checkbox.isChecked():
+                    checkbox.setChecked(False)  # Esto automáticamente quitará de la tabla de descartadas
     
     def parsear_rangos(self, texto):
         """
@@ -619,21 +673,28 @@ class DatosNF(QMainWindow):
     def marcar_filas_en_rangos(self, numeros):
         """Marca visualmente las filas que están en los rangos especificados"""
         # Limpiar marcas previas
-        for row in range(self.table_main.rowCount()):
-            for col in range(self.table_main.columnCount()):
-                item = self.table_main.item(row, col)
-                if item:
-                    item.setBackground(Qt.white)  # Restablecer color de fondo
+        self._limpiar_marcas_visuales()
         
         # Marcar filas en los rangos
         for numero in numeros:
             if 1 <= numero <= self.table_main.rowCount():
                 row_index = numero - 1  # Convertir a índice de fila (base 0)
-                for col in range(self.table_main.columnCount()):
-                    item = self.table_main.item(row_index, col)
-                    if item:
-                        # Marcar con color amarillo claro
-                        item.setBackground(QColor(255, 255, 150))  # Amarillo claro
+                self._marcar_fila_individual(row_index)
+
+    def _limpiar_marcas_visuales(self):
+        """Limpia todas las marcas visuales de la tabla principal"""
+        for row in range(self.table_main.rowCount()):
+            for col in range(self.table_main.columnCount()):
+                item = self.table_main.item(row, col)
+                if item:
+                    item.setBackground(Qt.white)
+
+    def _marcar_fila_individual(self, row_index):
+        """Marca una fila individual con color de resaltado"""
+        for col in range(self.table_main.columnCount()):
+            item = self.table_main.item(row_index, col)
+            if item:
+                item.setBackground(QColor(AppConstants.COLOR_AMARILLO_MARCA))
     
     def obtener_rangos_seleccionados(self):
         """Obtiene los rangos seleccionados por el usuario"""
@@ -779,89 +840,125 @@ class DatosNF(QMainWindow):
     def cargar_csv(self, ruta_csv):
         """Carga los datos del archivo CSV en la tabla principal"""
         try:
-            # Leer el CSV sin usar la primera fila como encabezados
-            # header=None hace que pandas trate todas las filas como datos
-            df = pd.read_csv(ruta_csv, header=None)
+            # Leer CSV y preparar tabla
+            df = self._leer_archivo_csv(ruta_csv)
+            num_filas = len(df)
+            self._preparar_tabla_principal(num_filas)
             
-            # Ajustar el número de filas según los datos del CSV
-            num_filas = len(df)  # Sin límite, usar todas las filas del CSV
-            self.table_main.setRowCount(num_filas)
+            # Mapear columnas y llenar datos
+            mapeo_columnas = self._mapear_columnas_csv(df)
+            self._llenar_tabla_con_datos(df, mapeo_columnas, num_filas)
             
-            # Obtener las columnas disponibles (ahora serán números: 0, 1, 2, 3, etc.)
-            columnas_disponibles = df.columns.tolist()
-            print(f"Columnas disponibles en CSV: {columnas_disponibles}")
-            print(f"Total de filas en CSV: {num_filas}")
+            # Configuración final
+            self._configurar_tabla_final()
+            self.actualizar_info_estrellas()
             
-            # Mapeo inteligente de columnas (ajustado para columnas numéricas)
-            mapeo_columnas = self.mapear_columnas_csv_numericas(columnas_disponibles)
-            print(f"Mapeo de columnas: {mapeo_columnas}")
-            
-            # Llenar la tabla con los datos del CSV
-            for row in range(num_filas):
-                # Columna 0: Número de estrella
-                item = QTableWidgetItem(str(row+1))
-                item.setTextAlignment(Qt.AlignCenter)
-                self.table_main.setItem(row, 0, item)
-                
-                # Columnas 1-4: Usar el mapeo inteligente
-                for col_tabla in range(1, 5):
-                    valor = ""
-                    col_csv = mapeo_columnas.get(col_tabla)
-                    
-                    if col_csv is not None and col_csv < len(columnas_disponibles):
-                        try:
-                            valor_raw = df.iloc[row, col_csv]
-                            if pd.notna(valor_raw):
-                                # Formatear según el tipo de columna
-                                if isinstance(valor_raw, (int, float)):
-                                    # Para columnas MV (3) y MI (4), no redondear
-                                    if col_tabla in [3, 4]:  # Columnas MV y MI
-                                        valor = str(valor_raw)
-                                    else:  # Columnas V (1) e I (2), redondear a 3 decimales
-                                        valor = f"{valor_raw:.3f}"
-                                else:
-                                    valor = str(valor_raw)
-                        except:
-                            valor = "N/A"
-                    
-                    item = QTableWidgetItem(valor)
-                    item.setTextAlignment(Qt.AlignCenter)
-                    self.table_main.setItem(row, col_tabla, item)
-                
-                # Columna 5: Descarte (checkbox)
-                checkbox = QCheckBox()
-                checkbox.setStyleSheet("""
-                    QCheckBox::indicator {
-                        width: 18px;
-                        height: 18px;
-                    }
-                    QCheckBox::indicator:unchecked {
-                        border: 2px solid #a7c942;
-                        background-color: white;
-                        border-radius: 3px;
-                    }
-                    QCheckBox::indicator:checked {
-                        border: 2px solid #a7c942;
-                        background-color: #a7c942;
-                        border-radius: 3px;
-                    }
-                """)
-                # Conectar el checkbox al método de manejo
-                checkbox.stateChanged.connect(lambda state, r=row: self.on_checkbox_descarte_changed(state, r))
-                
-                # Crear un widget contenedor para centrar el checkbox
-                checkbox_widget = QWidget()
-                checkbox_layout = QHBoxLayout(checkbox_widget)
-                checkbox_layout.addWidget(checkbox)
-                checkbox_layout.setAlignment(Qt.AlignCenter)
-                checkbox_layout.setContentsMargins(0, 0, 0, 0)
-                
-                self.table_main.setCellWidget(row, 5, checkbox_widget)
-                
         except Exception as e:
-            print(f"Error detallado al cargar CSV: {e}")
-            # En caso de error, mantener tabla vacía
-            self.table_main.setRowCount(0)
+            print(f"Error al cargar CSV: {e}")
+            QMessageBox.critical(self, "Error", f"No se pudo cargar el archivo CSV:\n{str(e)}")
+
+    def _leer_archivo_csv(self, ruta_csv):
+        """Lee el archivo CSV sin usar encabezados"""
+        df = pd.read_csv(ruta_csv, header=None)
+        columnas_disponibles = df.columns.tolist()
+        print(f"Columnas disponibles en CSV: {columnas_disponibles}")
+        print(f"Total de filas en CSV: {len(df)}")
+        return df
+
+    def _preparar_tabla_principal(self, num_filas):
+        """Prepara la tabla principal con el número correcto de filas"""
+        self.table_main.setRowCount(num_filas)
+
+    def _mapear_columnas_csv(self, df):
+        """Mapea las columnas del CSV a las columnas de la tabla usando mapeo inteligente"""
+        columnas_disponibles = df.columns.tolist()
+        
+        # Verificar si las columnas son numéricas (CSV sin encabezados) o tienen nombres
+        if all(isinstance(col, int) for col in columnas_disponibles):
+            # CSV sin encabezados - usar mapeo simple
+            mapeo_columnas = self.mapear_columnas_csv_numericas(columnas_disponibles)
+        else:
+            # CSV con encabezados - usar mapeo inteligente
+            mapeo_columnas = self.mapear_columnas_csv(columnas_disponibles)
+        
+        print(f"Mapeo de columnas: {mapeo_columnas}")
+        return mapeo_columnas
+
+    def _llenar_tabla_con_datos(self, df, mapeo_columnas, num_filas):
+        """Llena la tabla con los datos del CSV"""
+        for row in range(num_filas):
+            self._llenar_fila_tabla(df, row, mapeo_columnas)
+
+    def _llenar_fila_tabla(self, df, row, mapeo_columnas):
+        """Llena una fila específica de la tabla con datos del CSV"""
+        # Columna 0: Número de estrella
+        self._agregar_numero_estrella(row)
+        
+        # Columnas 1-4: Datos del CSV
+        self._agregar_datos_csv(df, row, mapeo_columnas)
+        
+        # Columna 5: Checkbox de descarte
+        self._agregar_checkbox_descarte(row)
+
+    def _agregar_numero_estrella(self, row):
+        """Agrega el número de estrella en la primera columna"""
+        item = QTableWidgetItem(str(row + 1))
+        item.setTextAlignment(Qt.AlignCenter)
+        self.table_main.setItem(row, 0, item)
+
+    def _agregar_datos_csv(self, df, row, mapeo_columnas):
+        """Agrega los datos del CSV en las columnas 1-4"""
+        for col_tabla in range(1, 5):
+            valor = self._obtener_valor_formateado(df, row, col_tabla, mapeo_columnas)
+            item = QTableWidgetItem(valor)
+            item.setTextAlignment(Qt.AlignCenter)
+            self.table_main.setItem(row, col_tabla, item)
+
+    def _obtener_valor_formateado(self, df, row, col_tabla, mapeo_columnas):
+        """Obtiene y formatea un valor del CSV según el tipo de columna"""
+        col_csv = mapeo_columnas.get(col_tabla)
+        
+        if col_csv is None or col_csv >= len(df.columns):
+            return ""
+        
+        try:
+            valor_raw = df.iloc[row, col_csv]
+            if pd.notna(valor_raw):
+                return self._formatear_valor_numerico(valor_raw, col_tabla)
+            return ""
+        except:
+            return "N/A"
+
+    def _formatear_valor_numerico(self, valor_raw, col_tabla):
+        """Formatea valores numéricos según el tipo de columna"""
+        if isinstance(valor_raw, (int, float)):
+            # Para columnas MV (3) y MI (4), no redondear
+            if col_tabla in [3, 4]:  # Columnas MV y MI
+                return str(valor_raw)
+            else:  # Columnas V (1) e I (2), redondear a 3 decimales
+                return f"{valor_raw:.3f}"
+        return str(valor_raw)
+
+    def _agregar_checkbox_descarte(self, row):
+        """Agrega el checkbox de descarte en la última columna"""
+        checkbox = QCheckBox()
+        checkbox.setStyleSheet(StyleSheets.CHECKBOX)
+        checkbox.stateChanged.connect(lambda state, r=row: self.on_checkbox_descarte_changed(state, r))
+        
+        # Crear widget contenedor centrado
+        checkbox_widget = QWidget()
+        checkbox_layout = QHBoxLayout(checkbox_widget)
+        checkbox_layout.addWidget(checkbox)
+        checkbox_layout.setAlignment(Qt.AlignCenter)
+        checkbox_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.table_main.setCellWidget(row, 5, checkbox_widget)
+
+    def _configurar_tabla_final(self):
+        """Configuración final de la tabla después de cargar datos"""
+        # Aplicar altura de filas
+        for row in range(self.table_main.rowCount()):
+            self.table_main.setRowHeight(row, AppConstants.ROW_HEIGHT_MAIN)
 
     def mapear_columnas_csv(self, columnas):
         """Mapea inteligentemente las columnas del CSV a las columnas de la tabla"""
@@ -950,22 +1047,32 @@ class DatosNF(QMainWindow):
 
     def actualizar_info_estrellas(self):
         """Actualiza la información de estrellas cargadas y descartadas"""
-        # Verificar que los widgets necesarios existen
-        if not hasattr(self, 'table_main') or not hasattr(self, 'table_descartadas') or not hasattr(self, 'label_descartadas'):
+        if not self._validar_widgets_informacion():
             return
         
         total_estrellas = self.table_main.rowCount()
         estrellas_descartadas = self.table_descartadas.rowCount()
         
-        # Crear texto informativo
-        if self.datos_formulario and 'archivo_csv' in self.datos_formulario:
-            archivo_info = f"Archivo: {self.datos_formulario['archivo_csv']}"
-            texto = f"<b>{archivo_info}</b><br>Total estrellas: {total_estrellas} | Descartadas: {estrellas_descartadas}"
-        else:
-            texto = f"<b>Sin archivo cargado</b><br>Total estrellas: {total_estrellas} | Descartadas: {estrellas_descartadas}"
-        
+        # Crear texto informativo usando constantes
+        texto = self._crear_texto_informativo(total_estrellas, estrellas_descartadas)
         self.label_descartadas.setText(texto)
-        self.label_descartadas.setAlignment(Qt.AlignCenter)
+
+    def _validar_widgets_informacion(self):
+        """Valida que los widgets necesarios para mostrar información existan"""
+        widgets_requeridos = ['table_main', 'table_descartadas', 'label_descartadas']
+        return all(hasattr(self, widget) for widget in widgets_requeridos)
+
+    def _crear_texto_informativo(self, total_estrellas, estrellas_descartadas):
+        """Crea el texto informativo con formato HTML usando constantes"""
+        if self.datos_formulario and 'archivo_csv' in self.datos_formulario:
+            archivo_info = f"{AppConstants.PREFIJO_ARCHIVO}: {self.datos_formulario['archivo_csv']}"
+            return (f"<b>{archivo_info}</b><br>"
+                   f"{AppConstants.LABEL_TOTAL_ESTRELLAS}: {total_estrellas} | "
+                   f"{AppConstants.LABEL_DESCARTADAS}: {estrellas_descartadas}")
+        else:
+            return (f"<b>{AppConstants.TEXTO_SIN_ARCHIVO}</b><br>"
+                   f"{AppConstants.LABEL_TOTAL_ESTRELLAS}: {total_estrellas} | "
+                   f"{AppConstants.LABEL_DESCARTADAS}: {estrellas_descartadas}")
 
     def ocultar_ventanas_anteriores(self):
         """Oculta las ventanas anteriores cuando se abre DatosNF"""

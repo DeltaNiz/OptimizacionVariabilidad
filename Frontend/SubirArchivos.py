@@ -8,6 +8,118 @@ from PyQt5.QtGui import QCursor
 import DatosNF
 import time
 
+class AppConstants:
+    """Constantes centralizadas para la aplicación SubirArchivos"""
+    
+    # Dimensiones de la ventana
+    WINDOW_WIDTH = 500
+    WINDOW_HEIGHT = 250
+    
+    # Anchos de componentes
+    COMBO_WIDTH = 200
+    BUTTON_WIDTH = 80
+    INPUT_WIDTH = 120
+    ROW_CONTAINER_WIDTH_LARGE = 290
+    ROW_CONTAINER_WIDTH_SMALL = 170
+    FORM_CONTAINER_WIDTH = 450
+    PROGRESS_BAR_WIDTH = 300
+    PROGRESS_BAR_HEIGHT = 20
+    
+    # Espaciados y márgenes
+    VERTICAL_SPACING = 10
+    HORIZONTAL_SPACING = 15
+    SEPARATOR_HEIGHT = 5
+    MAIN_MARGINS = 20
+    
+    # Colores del tema
+    COLOR_VERDE_PRINCIPAL = "#a7c942"
+    COLOR_VERDE_HOVER = "#98b83b"
+    COLOR_VERDE_PRESSED = "#7a9530"
+    
+    # Textos de placeholder
+    PLACEHOLDER_PERIODO_MAX = "Ej: 3"
+    PLACEHOLDER_PERIODO_MIN = "Ej: 2"
+    PLACEHOLDER_STEP = "Ej: 0.1"
+    
+    # Textos de combo por defecto
+    COMBO_DEFAULT_FOLDER = "Seleccione una carpeta..."
+    COMBO_DEFAULT_CSV = "Seleccione un archivo CSV..."
+    
+    # Textos de etiquetas
+    LABEL_DIAS = "Días"
+    LABEL_CARGAR_DATOS = "Cargar Datos"
+    LABEL_EXAMINAR = "Examinar"
+    
+    # Mensajes del loader
+    LOADER_CARGANDO = "Cargando datos..."
+    LOADER_PROCESANDO = "Procesando datos del CSV..."
+    LOADER_CREANDO = "Creando tabla de datos..."
+    LOADER_PREPARANDO = "Preparando interfaz..."
+    LOADER_MOSTRANDO = "Mostrando ventana..."
+
+class StyleSheets:
+    """Estilos CSS centralizados para la aplicación"""
+    
+    BUTTON_EXAMINAR = f"""
+        QPushButton {{
+            font-size: 12px;
+            color: white;
+            background-color: {AppConstants.COLOR_VERDE_PRINCIPAL};
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }}
+        QPushButton:hover {{
+            background-color: {AppConstants.COLOR_VERDE_HOVER};
+        }}
+    """
+    
+    BUTTON_CARGAR_DATOS = f"""
+        QPushButton {{
+            font-size: 15px;
+            color: white;
+            font-weight: bold;
+            background-color: {AppConstants.COLOR_VERDE_PRINCIPAL};
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+        }}
+        QPushButton:hover {{
+            background-color: {AppConstants.COLOR_VERDE_HOVER};
+        }}
+        QPushButton:pressed {{
+            background-color: {AppConstants.COLOR_VERDE_PRESSED};
+        }}
+    """
+    
+    LOADER_OVERLAY = """
+        QWidget {
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+    """
+    
+    LOADER_LABEL = """
+        QLabel {
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+    """
+    
+    PROGRESS_BAR = f"""
+        QProgressBar {{
+            border: 2px solid {AppConstants.COLOR_VERDE_PRINCIPAL};
+            border-radius: 10px;
+            background-color: white;
+            text-align: center;
+        }}
+        QProgressBar::chunk {{
+            background-color: {AppConstants.COLOR_VERDE_PRINCIPAL};
+            border-radius: 8px;
+        }}
+    """
+
 class CargaDatosWorker(QThread):
     """Worker thread para simular carga de datos sin bloquear la UI"""
     finished = pyqtSignal()  # Señal simple que indica que terminó
@@ -35,265 +147,198 @@ class SubirArchivos(QMainWindow):
         self.init_ui()
 
     def init_ui(self):
-        self.resize(500, 250)  # Aumentar altura para la nueva fila
+        """Inicializa la interfaz de usuario de manera modular"""
+        self.resize(AppConstants.WINDOW_WIDTH, AppConstants.WINDOW_HEIGHT)
         self.setWindowTitle("Subir Archivo")
 
-        # Formulario principal
-        form_layout = QFormLayout()
-        form_layout.setRowWrapPolicy(QFormLayout.DontWrapRows)
-        form_layout.setFieldGrowthPolicy(QFormLayout.FieldsStayAtSizeHint)
-        form_layout.setFormAlignment(Qt.AlignHCenter | Qt.AlignVCenter)  # Centrar horizontal y verticalmente
-        form_layout.setLabelAlignment(Qt.AlignRight)  # Alinear etiquetas a la derecha
-        form_layout.setVerticalSpacing(10)  # Espaciado entre filas
-        form_layout.setHorizontalSpacing(15)  # Espaciado entre etiquetas y campos
-
-        # Fila 1: Magnitudes I
-        labelI_inserte = QLabel("<b>Filtro <i>I</i> :</b>")
-        comboI = QComboBox()
-        comboI.setFixedWidth(200)  # Controlar ancho del combo
-        comboI.addItem("Seleccione una carpeta...")
-
-        # Botón para examinar carpeta
-        botonI_examinar = QPushButton("Examinar")
-        botonI_examinar.setFixedWidth(80)
-        botonI_examinar.setCursor(QCursor(Qt.PointingHandCursor))
-        botonI_examinar.setStyleSheet("""
-            QPushButton {
-                font-size: 12px;
-                color: white;
-                background-color: #a7c942;
-                border: none;
-                padding: 5px 10px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #98b83b;
-            }
-        """)
+        # Configurar formulario principal
+        form_layout = self._setup_form_layout()
         
-        # Conectar el botón con la función de selección de carpeta
-        botonI_examinar.clicked.connect(lambda: self.seleccionar_carpeta('I'))
-
-        # Crear un widget contenedor para combo y botón
-        folderI_row = QWidget()
-        folderI_row.setFixedWidth(290)  # Controlar ancho total del contenedor
-        folderI_row_layout = QHBoxLayout()
-        folderI_row_layout.addWidget(comboI)
-        folderI_row_layout.addWidget(botonI_examinar)
-        folderI_row_layout.setContentsMargins(0,0,0,0)
-        folderI_row_layout.setAlignment(Qt.AlignCenter)  # Centrar contenido del HBox
-        folderI_row.setLayout(folderI_row_layout)
-
-        form_layout.addRow(labelI_inserte, folderI_row)
-
-        # Guardar referencia al combo para usarlo en la función
-        self.combo_I = comboI
-
-        # Fila 2: Magnitudes V
-        labelV_inserte = QLabel("<b>Filtro <i>V</i> :</b>")
-        comboV = QComboBox()
-        comboV.setFixedWidth(200)  # Controlar ancho del combo
-        comboV.addItem("Seleccione una carpeta...")
-
-        # Botón para examinar carpeta
-        botonV_examinar = QPushButton("Examinar")
-        botonV_examinar.setFixedWidth(80)
-        botonV_examinar.setCursor(QCursor(Qt.PointingHandCursor))
-        botonV_examinar.setStyleSheet("""
-            QPushButton {
-                font-size: 12px;
-                color: white;
-                background-color: #a7c942;
-                border: none;
-                padding: 5px 10px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #98b83b;
-            }
-        """)
+        # Crear todas las filas del formulario
+        self._create_all_form_rows(form_layout)
         
-        # Conectar el botón con la función de selección de carpeta
-        botonV_examinar.clicked.connect(lambda: self.seleccionar_carpeta('V'))
-
-        # Crear un widget contenedor para combo y botón
-        folderV_row = QWidget()
-        folderV_row.setFixedWidth(290)  # Controlar ancho total del contenedor
-        folderV_row_layout = QHBoxLayout()
-        folderV_row_layout.addWidget(comboV)
-        folderV_row_layout.addWidget(botonV_examinar)
-        folderV_row_layout.setContentsMargins(0,0,0,0)
-        folderV_row_layout.setAlignment(Qt.AlignCenter)  # Centrar contenido del HBox
-        folderV_row.setLayout(folderV_row_layout)
-
-        form_layout.addRow(labelV_inserte, folderV_row)
-
-        # Guardar referencia al combo para usarlo en la función
-        self.combo_V = comboV
-
-        # Fila 3: Subir archivo CSV
-        label_csv = QLabel("<b>Archivo Mag. (.csv):</b>")
-        combo_csv = QComboBox()
-        combo_csv.setFixedWidth(200)  # Controlar ancho del combo
-        combo_csv.addItem("Seleccione un archivo CSV...")
-        
-        # Botón para examinar archivo CSV
-        boton_csv = QPushButton("Examinar")
-        boton_csv.setFixedWidth(80)
-        boton_csv.setCursor(QCursor(Qt.PointingHandCursor))
-        boton_csv.setStyleSheet("""
-            QPushButton {
-                font-size: 12px;
-                color: white;
-                background-color: #a7c942;
-                border: none;
-                padding: 5px 10px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #98b83b;
-            }
-        """)
-        
-        # Conectar el botón con la función de selección de archivo CSV
-        boton_csv.clicked.connect(self.seleccionar_archivo_csv)
-        
-        # Crear un widget contenedor para combo CSV y botón
-        csv_row = QWidget()
-        csv_row.setFixedWidth(290)  # Controlar ancho total del contenedor
-        csv_row_layout = QHBoxLayout()
-        csv_row_layout.addWidget(combo_csv)
-        csv_row_layout.addWidget(boton_csv)
-        csv_row_layout.setContentsMargins(0,0,0,0)
-        csv_row_layout.setAlignment(Qt.AlignCenter)  # Centrar contenido del HBox
-        csv_row.setLayout(csv_row_layout)
-        
-        form_layout.addRow(label_csv, csv_row)
-        
-        # Guardar referencia al combo CSV para usarlo en la función
-        self.combo_csv = combo_csv
-
-        # Fila 4: Periodo Máx
-        label_periodo_max = QLabel("<b>Periodo Máx:</b>")
-        input_max = QLineEdit("")
-        input_max.setPlaceholderText("Ej: 3")
-        input_max.setFixedWidth(120)  # Controlar ancho del input
-        dias_label1 = QLabel("Días")
-        max_row = QWidget()
-        max_row.setFixedWidth(170)  # Controlar ancho total del contenedor
-        max_row_layout = QHBoxLayout()
-        max_row_layout.addWidget(input_max)
-        max_row_layout.addWidget(dias_label1)
-        max_row_layout.setContentsMargins(0,0,0,0)
-        max_row_layout.setAlignment(Qt.AlignCenter)  # Centrar contenido del HBox
-        max_row.setLayout(max_row_layout)
-        form_layout.addRow(label_periodo_max, max_row)
-        
-        # Guardar referencia al input para usarlo en la función
-        self.input_periodo_max = input_max
-
-        # Fila 5: Periodo Min
-        label_periodo_min = QLabel("<b>Periodo Min:</b>")
-        input_min = QLineEdit("")
-        input_min.setPlaceholderText("Ej: 2")
-        input_min.setFixedWidth(120)  # Controlar ancho del input
-        dias_label2 = QLabel("Días")
-        min_row = QWidget()
-        min_row.setFixedWidth(170)  # Controlar ancho total del contenedor
-        min_row_layout = QHBoxLayout()
-        min_row_layout.addWidget(input_min)
-        min_row_layout.addWidget(dias_label2)
-        min_row_layout.setContentsMargins(0,0,0,0)
-        min_row_layout.setAlignment(Qt.AlignCenter)  # Centrar contenido del HBox
-        min_row.setLayout(min_row_layout)
-        form_layout.addRow(label_periodo_min, min_row)
-        
-        # Guardar referencia al input para usarlo en la función
-        self.input_periodo_min = input_min
-
-        # Fila 6: Step (Saltos)
-        label_step = QLabel("<b>Step (Saltos):</b>")
-        input_step = QLineEdit("")
-        input_step.setPlaceholderText("Ej: 0.1")
-        input_step.setFixedWidth(120)  # Controlar ancho del input
-        dias_label3 = QLabel("Días")
-        step_row = QWidget()
-        step_row.setFixedWidth(170)  # Controlar ancho total del contenedor
-        step_row_layout = QHBoxLayout()
-        step_row_layout.addWidget(input_step)
-        step_row_layout.addWidget(dias_label3)
-        step_row_layout.setContentsMargins(0,0,0,0)
-        step_row_layout.setAlignment(Qt.AlignCenter)  # Centrar contenido del HBox
-        step_row.setLayout(step_row_layout)
-        form_layout.addRow(label_step, step_row)
-        
-        # Guardar referencia al input para usarlo en la función
-        self.input_step = input_step
-
-        # Agregar separación vertical entre fila 6 y 7
-        separador = QLabel("")  # Etiqueta vacía como separador
-        separador.setFixedHeight(5)  # Altura del espaciado
-        form_layout.addRow(separador)
-
-        # Fila 7: Botón de análisis
-        boton = QPushButton("Cargar Datos")
-
-        # al click del botón, se abre la ventana de DatosNF
-        boton.clicked.connect(self.abrir_datos_nf)  # Conectar el botón a la función
-        boton.setCursor(QCursor(Qt.PointingHandCursor))
-        boton.setStyleSheet("""
-            QPushButton {
-                font-size: 15px;
-                color: white;
-                font-weight: bold;
-                background-color: #a7c942;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 8px;
-            }
-            QPushButton:hover {
-                background-color: #98b83b;
-            }
-            QPushButton:pressed {
-                background-color: #7a9530;
-            }
-        """)
-        
-        # Agregar el botón usando addRow con alineación
-        form_layout.addRow(boton)
-        
-        # Obtener el widget del botón y centrarlo
-        boton_item = form_layout.itemAt(form_layout.rowCount()-1, QFormLayout.SpanningRole)
-        if boton_item:
-            boton_item.setAlignment(Qt.AlignCenter)
-
-        # Layout general
-        container = QWidget()
-        main_layout = QVBoxLayout()
-        
-        # Crear un widget contenedor para el formulario
-        form_container = QWidget()
-        form_container.setLayout(form_layout)
-        form_container.setFixedWidth(450)  # Ancho fijo para el formulario
-        
-        main_layout.addWidget(form_container, alignment=Qt.AlignCenter)  # Centrar horizontal y verticalmente
-        main_layout.setContentsMargins(20, 20, 20, 20)  # Márgenes alrededor del contenido
-
-        container.setLayout(main_layout)
-        self.setCentralWidget(container)
+        # Configurar contenedor principal
+        self._setup_main_container(form_layout)
         
         # Crear loader (inicialmente oculto)
         self.crear_loader()
 
+    def _setup_form_layout(self):
+        """Configura el layout del formulario con espaciados y alineaciones"""
+        form_layout = QFormLayout()
+        form_layout.setRowWrapPolicy(QFormLayout.DontWrapRows)
+        form_layout.setFieldGrowthPolicy(QFormLayout.FieldsStayAtSizeHint)
+        form_layout.setFormAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        form_layout.setLabelAlignment(Qt.AlignRight)
+        form_layout.setVerticalSpacing(AppConstants.VERTICAL_SPACING)
+        form_layout.setHorizontalSpacing(AppConstants.HORIZONTAL_SPACING)
+        return form_layout
+
+    def _create_all_form_rows(self, form_layout):
+        """Crea todas las filas del formulario de manera organizada"""
+        # Fila 1: Filtro I
+        self._create_folder_row(form_layout, "I", "<b>Filtro <i>I</i> :</b>")
+        
+        # Fila 2: Filtro V  
+        self._create_folder_row(form_layout, "V", "<b>Filtro <i>V</i> :</b>")
+        
+        # Fila 3: Archivo CSV
+        self._create_csv_row(form_layout)
+        
+        # Fila 4: Periodo Máx
+        self._create_input_row(form_layout, "periodo_max", "<b>Periodo Máx:</b>", 
+                              AppConstants.PLACEHOLDER_PERIODO_MAX)
+        
+        # Fila 5: Periodo Min
+        self._create_input_row(form_layout, "periodo_min", "<b>Periodo Min:</b>", 
+                              AppConstants.PLACEHOLDER_PERIODO_MIN)
+        
+        # Fila 6: Step
+        self._create_input_row(form_layout, "step", "<b>Step (Saltos):</b>", 
+                              AppConstants.PLACEHOLDER_STEP)
+        
+        # Separador
+        self._add_separator(form_layout)
+        
+        # Fila 7: Botón cargar datos
+        self._create_submit_button(form_layout)
+
+    def _create_folder_row(self, form_layout, filtro_tipo, label_text):
+        """Crea una fila para selección de carpeta (I o V)"""
+        label = QLabel(label_text)
+        
+        # Crear combo y botón
+        combo = self._create_combo(AppConstants.COMBO_DEFAULT_FOLDER)
+        button = self._create_examine_button()
+        
+        # Conectar funcionalidad
+        button.clicked.connect(lambda: self.seleccionar_carpeta(filtro_tipo))
+        
+        # Crear contenedor
+        row_widget = self._create_row_container([combo, button], AppConstants.ROW_CONTAINER_WIDTH_LARGE)
+        
+        # Agregar al formulario
+        form_layout.addRow(label, row_widget)
+        
+        # Guardar referencia
+        if filtro_tipo == 'I':
+            self.combo_I = combo
+        else:
+            self.combo_V = combo
+
+    def _create_csv_row(self, form_layout):
+        """Crea la fila para selección de archivo CSV"""
+        label = QLabel("<b>Archivo Mag. (.csv):</b>")
+        
+        # Crear combo y botón
+        combo = self._create_combo(AppConstants.COMBO_DEFAULT_CSV)
+        button = self._create_examine_button()
+        
+        # Conectar funcionalidad
+        button.clicked.connect(self.seleccionar_archivo_csv)
+        
+        # Crear contenedor
+        row_widget = self._create_row_container([combo, button], AppConstants.ROW_CONTAINER_WIDTH_LARGE)
+        
+        # Agregar al formulario
+        form_layout.addRow(label, row_widget)
+        
+        # Guardar referencia
+        self.combo_csv = combo
+
+    def _create_input_row(self, form_layout, field_name, label_text, placeholder):
+        """Crea una fila para entrada de datos numéricos"""
+        label = QLabel(label_text)
+        
+        # Crear input y etiqueta de días
+        input_field = QLineEdit("")
+        input_field.setPlaceholderText(placeholder)
+        input_field.setFixedWidth(AppConstants.INPUT_WIDTH)
+        
+        dias_label = QLabel(AppConstants.LABEL_DIAS)
+        
+        # Crear contenedor
+        row_widget = self._create_row_container([input_field, dias_label], AppConstants.ROW_CONTAINER_WIDTH_SMALL)
+        
+        # Agregar al formulario
+        form_layout.addRow(label, row_widget)
+        
+        # Guardar referencia
+        setattr(self, f"input_{field_name}", input_field)
+
+    def _create_combo(self, default_text):
+        """Crea un combobox con configuración estándar"""
+        combo = QComboBox()
+        combo.setFixedWidth(AppConstants.COMBO_WIDTH)
+        combo.addItem(default_text)
+        return combo
+
+    def _create_examine_button(self):
+        """Crea un botón de examinar con estilo estándar"""
+        button = QPushButton(AppConstants.LABEL_EXAMINAR)
+        button.setFixedWidth(AppConstants.BUTTON_WIDTH)
+        button.setCursor(QCursor(Qt.PointingHandCursor))
+        button.setStyleSheet(StyleSheets.BUTTON_EXAMINAR)
+        return button
+
+    def _create_row_container(self, widgets, width):
+        """Crea un contenedor horizontal para widgets con ancho específico"""
+        container = QWidget()
+        container.setFixedWidth(width)
+        
+        layout = QHBoxLayout()
+        for widget in widgets:
+            layout.addWidget(widget)
+        
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setAlignment(Qt.AlignCenter)
+        container.setLayout(layout)
+        
+        return container
+
+    def _add_separator(self, form_layout):
+        """Agrega un separador vertical al formulario"""
+        separator = QLabel("")
+        separator.setFixedHeight(AppConstants.SEPARATOR_HEIGHT)
+        form_layout.addRow(separator)
+
+    def _create_submit_button(self, form_layout):
+        """Crea el botón principal de carga de datos"""
+        button = QPushButton(AppConstants.LABEL_CARGAR_DATOS)
+        button.clicked.connect(self.abrir_datos_nf)
+        button.setCursor(QCursor(Qt.PointingHandCursor))
+        button.setStyleSheet(StyleSheets.BUTTON_CARGAR_DATOS)
+        
+        # Agregar el botón al formulario
+        form_layout.addRow(button)
+        
+        # Centrar el botón
+        button_item = form_layout.itemAt(form_layout.rowCount()-1, QFormLayout.SpanningRole)
+        if button_item:
+            button_item.setAlignment(Qt.AlignCenter)
+
+    def _setup_main_container(self, form_layout):
+        """Configura el contenedor principal de la ventana"""
+        container = QWidget()
+        main_layout = QVBoxLayout()
+        
+        # Crear contenedor del formulario
+        form_container = QWidget()
+        form_container.setLayout(form_layout)
+        form_container.setFixedWidth(AppConstants.FORM_CONTAINER_WIDTH)
+        
+        main_layout.addWidget(form_container, alignment=Qt.AlignCenter)
+        main_layout.setContentsMargins(AppConstants.MAIN_MARGINS, AppConstants.MAIN_MARGINS, 
+                                     AppConstants.MAIN_MARGINS, AppConstants.MAIN_MARGINS)
+
+        container.setLayout(main_layout)
+        self.setCentralWidget(container)
+
     def crear_loader(self):
-        """Crea el widget de loader"""
+        """Crea el widget de loader con estilos centralizados"""
         # Widget overlay para el loader
         self.loader_widget = QWidget(self)
-        self.loader_widget.setStyleSheet("""
-            QWidget {
-                background-color: rgba(0, 0, 0, 0.7);
-            }
-        """)
+        self.loader_widget.setStyleSheet(StyleSheets.LOADER_OVERLAY)
         self.loader_widget.hide()  # Oculto inicialmente
         
         # Layout para centrar el contenido del loader
@@ -301,34 +346,16 @@ class SubirArchivos(QMainWindow):
         loader_layout.setAlignment(Qt.AlignCenter)
         
         # Etiqueta de texto
-        self.loader_label = QLabel("Cargando datos...")
-        self.loader_label.setStyleSheet("""
-            QLabel {
-                color: white;
-                font-size: 16px;
-                font-weight: bold;
-                margin-bottom: 10px;
-            }
-        """)
+        self.loader_label = QLabel(AppConstants.LOADER_CARGANDO)
+        self.loader_label.setStyleSheet(StyleSheets.LOADER_LABEL)
         self.loader_label.setAlignment(Qt.AlignCenter)
         
         # Barra de progreso
         self.progress_bar = QProgressBar()
-        self.progress_bar.setFixedWidth(300)
-        self.progress_bar.setFixedHeight(20)
+        self.progress_bar.setFixedWidth(AppConstants.PROGRESS_BAR_WIDTH)
+        self.progress_bar.setFixedHeight(AppConstants.PROGRESS_BAR_HEIGHT)
         self.progress_bar.setRange(0, 0)  # Modo indeterminado
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: 2px solid #a7c942;
-                border-radius: 10px;
-                background-color: white;
-                text-align: center;
-            }
-            QProgressBar::chunk {
-                background-color: #a7c942;
-                border-radius: 8px;
-            }
-        """)
+        self.progress_bar.setStyleSheet(StyleSheets.PROGRESS_BAR)
         
         loader_layout.addWidget(self.loader_label)
         loader_layout.addWidget(self.progress_bar)
@@ -514,12 +541,12 @@ class SubirArchivos(QMainWindow):
     def on_carga_completada(self):
         """Se ejecuta cuando la carga de datos se completa exitosamente"""
         try:
-            # Actualizar el texto del loader para indicar que se está creando la ventana
-            self.loader_label.setText("Procesando datos del CSV...")
+            # Actualizar el texto del loader usando constantes
+            self.loader_label.setText(AppConstants.LOADER_PROCESANDO)
             QApplication.processEvents()  # Forzar actualización de UI
             
             # Usar QTimer para permitir que la UI se actualice
-            QTimer.singleShot(200, self.crear_ventana_datos)  # Aumentado a 200ms
+            QTimer.singleShot(200, self.crear_ventana_datos)
             
         except Exception as e:
             # Si hay error al crear la ventana, tratarlo como error
@@ -528,8 +555,8 @@ class SubirArchivos(QMainWindow):
     def crear_ventana_datos(self):
         """Crea la ventana DatosNF después de un pequeño delay"""
         try:
-            # Actualizar mensaje
-            self.loader_label.setText("Creando tabla de datos...")
+            # Actualizar mensaje usando constantes
+            self.loader_label.setText(AppConstants.LOADER_CREANDO)
             QApplication.processEvents()
             
             # Crear un timer que mantenga la animación activa durante la creación
@@ -551,12 +578,12 @@ class SubirArchivos(QMainWindow):
             # Mostrar datos en consola para debugging
             self.datos_nf_window.mostrar_datos_formulario()
             
-            # Actualizar texto del loader una vez más
-            self.loader_label.setText("Preparando interfaz...")
+            # Actualizar texto del loader usando constantes
+            self.loader_label.setText(AppConstants.LOADER_PREPARANDO)
             QApplication.processEvents()
             
             # Usar otro QTimer para mostrar la ventana después de que esté completamente lista
-            QTimer.singleShot(300, self.mostrar_ventana_final)  # Aumentado a 300ms
+            QTimer.singleShot(300, self.mostrar_ventana_final)
             
         except Exception as e:
             # Asegurarse de detener el timer en caso de error
@@ -568,8 +595,8 @@ class SubirArchivos(QMainWindow):
     def mostrar_ventana_final(self):
         """Muestra la ventana DatosNF y oculta el loader"""
         try:
-            # Actualizar mensaje del loader
-            self.loader_label.setText("Mostrando ventana...")
+            # Actualizar mensaje del loader usando constantes
+            self.loader_label.setText(AppConstants.LOADER_MOSTRANDO)
             QApplication.processEvents()
             
             # Mostrar la ventana como modal
@@ -582,7 +609,7 @@ class SubirArchivos(QMainWindow):
             QApplication.processEvents()
             
             # Ocultar el loader después de mostrar la ventana
-            QTimer.singleShot(500, self.ocultar_loader_final)  # Ocultar después de 0.5 segundos
+            QTimer.singleShot(500, self.ocultar_loader_final)
             
         except Exception as e:
             self.on_error_carga(str(e))
@@ -590,7 +617,7 @@ class SubirArchivos(QMainWindow):
     def ocultar_loader_final(self):
         """Oculta el loader y restaura el texto original"""
         self.ocultar_loader()
-        self.loader_label.setText("Cargando datos...")  # Restaurar texto original
+        self.loader_label.setText(AppConstants.LOADER_CARGANDO)  # Restaurar texto original usando constante
 
     def on_error_carga(self, error_msg):
         """Se ejecuta cuando hay un error durante la carga"""
