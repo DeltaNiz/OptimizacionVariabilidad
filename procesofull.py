@@ -1,8 +1,10 @@
 from __future__ import print_function, division
 import numpy as np
+from numba import njit, prange
 import matplotlib.pylab as plt
 from PyAstronomy.pyTiming import pyPeriod
 from PyAstronomy.pyTiming import pyPDM
+from pdmpy import pdm
 import scipy.interpolate as sciinter
 import scipy.optimize as sciopti
 import os
@@ -11,12 +13,76 @@ import time as t
 import sys
 import argparse
 
+def print_timer(message, start_time):
+    """Función auxiliar para imprimir tiempos transcurridos"""
+    elapsed = t.time() - start_time
+    print(f"[TIMER] {message}: {elapsed:.2f}s")
+    sys.stdout.flush()
+    return t.time()  # Retorna nuevo tiempo de inicio
+
+@njit(parallel=True)
+def compute_thetas_pypdm_style(time, flux, freqs, nbin, ncovers):
+    nfreqs = len(freqs)
+    thetas = np.zeros(nfreqs)
+
+    for j in prange(nfreqs):
+        f = freqs[j]
+        period = 1.0 / f
+        theta_covers = np.zeros(ncovers)
+
+        for cover in range(ncovers):
+            shift = cover / ncovers
+            phases = ((time / period + shift) % 1.0)
+
+            bins = np.linspace(0, 1, nbin + 1)
+            bin_means = np.zeros(nbin)
+            bin_counts = np.zeros(nbin)
+            bin_vars = np.zeros(nbin)
+
+            for i in range(len(phases)):
+                for b in range(nbin):
+                    if bins[b] <= phases[i] < bins[b+1]:
+                        bin_means[b] += flux[i]
+                        bin_counts[b] += 1
+                        break
+
+            for b in range(nbin):
+                if bin_counts[b] > 0:
+                    bin_means[b] /= bin_counts[b]
+
+            # Segunda pasada: varianzas
+            for i in range(len(phases)):
+                for b in range(nbin):
+                    if bins[b] <= phases[i] < bins[b+1]:
+                        if bin_counts[b] > 0:
+                            bin_vars[b] += (flux[i] - bin_means[b])**2
+                        break
+
+            sbin = np.sum(bin_vars)
+            s2 = np.sum((flux - np.mean(flux))**2)
+            theta_covers[cover] = sbin / s2 if s2 > 0 else 1.0
+
+        thetas[j] = np.mean(theta_covers)
+
+    return thetas
+
+
+def pdm_with_covers_pypdm_like(time, flux, f_min, f_max, delf, nbin=10, ncovers=3):
+    freqs = np.arange(f_min, f_max, delf)
+    thetas = compute_thetas_pypdm_style(time, flux, freqs, nbin, ncovers)
+    return freqs, thetas
+
 def main():
+    script_start = t.time()
+    print("[TIMER] Iniciando script procesofull.py")
+    
     # Configurar argumentos de línea de comandos
     parser = argparse.ArgumentParser(description='Procesar análisis de estrellas')
     parser.add_argument('--data_folder', help='Ruta de la carpeta con los datos de las estrellas')
     
     args = parser.parse_args()
+    
+    print_timer("Configuración inicial", script_start)
     
     # Determinar carpeta de datos
     if args.data_folder:
@@ -60,11 +126,15 @@ def main():
             init_time = t.time()
             
             try:
+                load_start = t.time()
                 print("Cargando datos...")
                 sys.stdout.flush()
+                
                 dataV= np.loadtxt(os.path.join(route, fileV))
                 dataI= np.loadtxt(os.path.join(route, fileI))
+                load_time = print_timer("Carga de archivos", load_start)
 
+                prep_start = t.time()
                 dataredV=dataV[::2]
                 dataredI=dataI[::2]
 
@@ -73,14 +143,18 @@ def main():
 
                 timeI = dataI[:,0]
                 fluxI = dataI[:,1]
+                
+                prep_time = print_timer("Preparación de datos", prep_start)
 
+                gls_start = t.time()
                 print("Ejecutando análisis GLS...")
                 sys.stdout.flush()
                 #------------------------------GLS-----------------------------------
                 Pend = 3
+                gls_v_start = t.time()
                 clp = pyPeriod.Gls((time, flux), norm="ZK", Pbeg=0.01, Pend=Pend)
-                #clp.info()
-
+                gls_v_time = print_timer("GLS filtro V", gls_v_start)
+                
                 fapLevels = np.array([0.1, 0.05, 0.01, 0.001])
                 plevels = clp.powerLevel(fapLevels)
 
@@ -95,8 +169,9 @@ def main():
                 periodos= (1./clp.freq)
                 power=clp.power
 
+                gls_i_start = t.time()
                 clpI = pyPeriod.Gls((timeI, fluxI), norm="ZK", Pbeg=0.01, Pend=Pend)
-
+                gls_i_time = print_timer("GLS filtro I", gls_i_start)
 
                 fapLevelsI = np.array([0.1, 0.05, 0.01, 0.001])
                 plevelsI = clpI.powerLevel(fapLevels)
@@ -111,34 +186,49 @@ def main():
                 periodosI= (1./clpI.freq)
                 powerI=clpI.power
 
+                gls_total_time = print_timer("GLS total", gls_start)
+
+                pdm_start = t.time()
                 print("Ejecutando análisis PDM...")
                 sys.stdout.flush()
+                
                 #-----------------------------PDM--------------------------------------
-                S = pyPDM.Scanner(minVal=(1./clp.Pend), maxVal=(1./clp.Pbeg), dVal=freqstep, mode="frequency")
+                pdm_v_start = t.time()
+                """S = pyPDM.Scanner(minVal=(1./clp.Pend), maxVal=(1./clp.Pbeg), dVal=freqstep, mode="frequency")
                 P = pyPDM.PyPDM(time, flux)
 
                 f1, t1 = P.pdmEquiBinCover(7, 3, S)
-                thetmin1=np.min(t1)
+                """
+                f1, t1 = pdm_with_covers_pypdm_like(time, flux, f_min=1./clp.Pend, f_max=1./clp.Pbeg, delf=freqstep, nbin=7, ncovers=3)
+                thetmin1= np.min(t1)
                 periodpdmV = (1/f1)[np.argmin(t1)]
+                
+                pdm_v_time = print_timer("PDM filtro V", pdm_v_start)
 
                 equis= np.linspace(0, 10.0, 2)
                 lequis=np.array([thetmin1 for i in range(len(equis))])
 
                 periodo1 = (1/f1)
 
-
-                SI = pyPDM.Scanner(minVal=(1./clpI.Pend), maxVal=(1./clpI.Pbeg), dVal=freqstepI, mode="frequency")
+                pdm_i_start = t.time()
+                """SI = pyPDM.Scanner(minVal=(1./clpI.Pend), maxVal=(1./clpI.Pbeg), dVal=freqstepI, mode="frequency")
                 PI = pyPDM.PyPDM(timeI,  fluxI)
 
-                f2, t2 = PI.pdmEquiBinCover(7, 3, SI)
+                f2, t2 = PI.pdmEquiBinCover(7, 3, SI)"""
+                f2, t2 = pdm_with_covers_pypdm_like(timeI, fluxI, f_min=1./clpI.Pend, f_max=1./clpI.Pbeg, delf=freqstepI, nbin=7, ncovers=3)
                 thetmin2=np.min(t2)
                 periodpdmI = (1/f2)[np.argmin(t2)]
+                
+                pdm_i_time = print_timer("PDM filtro I", pdm_i_start)
 
                 equisI= np.linspace(0, 10.0, 2)
                 lequisI=np.array([thetmin2 for i in range(len(equisI))])
 
                 periodo2 = (1/f2)
 
+                pdm_total_time = print_timer("PDM total", pdm_start)
+
+                peaks_start = t.time()
                 print("Detectando picos de frecuencia...")
                 sys.stdout.flush()
                 #-----------------------------Frequency Peaks--------------------------------------
@@ -156,6 +246,9 @@ def main():
                 pdmperiodsv = 1./f1[peakspdmv]
                 pdmperiodsi = 1./f2[peakspdmi]
 
+                peaks_time = print_timer("Detección de picos", peaks_start)
+
+                save_start = t.time()
                 print("Organizando y guardando resultados...")
                 sys.stdout.flush()
                 #---sort---
@@ -187,6 +280,8 @@ def main():
                 df4 = pd.DataFrame({'freq': freqspdmi, 'period': perpdmi})
                 df4.to_csv(os.path.join(route,'ppdmi.csv'), index=False)
 
+                save_time = print_timer("Guardado de CSVs", save_start)
+
                 peakspowerv = clp.power[peaksglsv]
                 peakspoweri = clpI.power[peaksglsi]
 
@@ -199,6 +294,7 @@ def main():
                 print(f'Best Minima PDM V: {periodpdmV}')
                 print(f'Best Minima PDM I: {periodpdmI}')
 
+                plot_start = t.time()
                 print("Generando gráficos...")
                 sys.stdout.flush()
                 #-----------------------------Plots---------------------------------------
@@ -253,9 +349,22 @@ def main():
                 #plt.savefig(figrute2)
                 plt.close()
                 
+                plot_time = print_timer("Generación de gráficos", plot_start)
+                
                 end_time = t.time()  # End timing
                 elapsed_time = (end_time - init_time) / 60  # Convert to minutes
-                print(f'Tiempo de análisis: {elapsed_time:.2f} minutos')
+                
+                # Resumen de tiempos por estrella
+                print(f"\n=== RESUMEN DE TIEMPOS ESTRELLA {star_number} ===")
+                print(f"Tiempo total de análisis: {elapsed_time:.2f} minutos")
+                star_total_seconds = end_time - init_time
+                print(f"[TIMER] Carga datos: {((load_time - load_start) / star_total_seconds * 100):.1f}%")
+                print(f"[TIMER] GLS: {((gls_total_time - gls_start) / star_total_seconds * 100):.1f}%")
+                print(f"[TIMER] PDM: {((pdm_total_time - pdm_start) / star_total_seconds * 100):.1f}%")
+                print(f"[TIMER] Picos: {((peaks_time - peaks_start) / star_total_seconds * 100):.1f}%")
+                print(f"[TIMER] Gráficos: {((plot_time - plot_start) / star_total_seconds * 100):.1f}%")
+                print(f"=====================================\n")
+                
                 print(f'Estrella {star_number} completada exitosamente')
                 sys.stdout.flush()
                 
