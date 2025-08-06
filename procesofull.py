@@ -12,6 +12,205 @@ import pandas as pd
 import time as t
 import sys
 import argparse
+import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor, as_completed
+#import psutil
+import logging
+import traceback
+
+def get_optimal_workers():
+    """Detecta automáticamente el número óptimo de procesos paralelos"""
+    try:
+        # Detectar número de núcleos físicos
+        physical_cores = mp.cpu_count() // 2 if mp.cpu_count() > 2 else mp.cpu_count()
+        
+        # Detectar RAM disponible (estimación sin psutil)
+        import platform
+        if platform.system() == "Windows":
+            # Estimación conservadora para Windows
+            estimated_ram_gb = 8  # Asumimos al menos 8GB
+        else:
+            estimated_ram_gb = 8
+        
+        # Calcular workers óptimos basado en memoria y CPU
+        # Cada proceso usa ~2-3GB de RAM
+        max_workers_by_memory = max(1, min(estimated_ram_gb // 3, 8))
+        max_workers_by_cpu = max(1, min(physical_cores - 1, 12))
+        
+        optimal_workers = min(max_workers_by_memory, max_workers_by_cpu)
+        
+        return max(1, min(optimal_workers, 6))  # Máximo 6 para seguridad
+    except:
+        return 2  # Fallback seguro
+
+def process_single_star(star_data):
+    """Procesa una sola estrella de forma independiente"""
+    data_folder, star_name = star_data
+    
+    try:
+        route = os.path.join(data_folder, star_name)
+        files = os.listdir(route)
+        star_number = int(star_name[4:])
+        
+        fileV = next((f for f in files if f.endswith('V')), None)
+        fileI = next((f for f in files if f.endswith('i')), None)
+        
+        if not (fileV and fileI):
+            return {
+                'star': star_name,
+                'status': 'error',
+                'message': f'Archivos faltantes: V={fileV}, I={fileI}',
+                'time': 0
+            }
+        
+        init_time = t.time()
+        
+        # Cargar datos
+        dataV = np.loadtxt(os.path.join(route, fileV))
+        dataI = np.loadtxt(os.path.join(route, fileI))
+        
+        # Preparar datos
+        time_v = dataV[:, 0]
+        flux_v = dataV[:, 1]
+        time_i = dataI[:, 0]
+        flux_i = dataI[:, 1]
+        
+        # Análisis GLS
+        Pend = 3
+        clp = pyPeriod.Gls((time_v, flux_v), norm="ZK", Pbeg=0.01, Pend=Pend)
+        clpI = pyPeriod.Gls((time_i, flux_i), norm="ZK", Pbeg=0.01, Pend=Pend)
+        
+        # Análisis PDM
+        f1, t1 = pdm_with_covers_pypdm_like(
+            time_v, flux_v, 
+            f_min=1./clp.Pend, f_max=1./clp.Pbeg, 
+            delf=clp.fstep, nbin=7, ncovers=3
+        )
+        
+        f2, t2 = pdm_with_covers_pypdm_like(
+            time_i, flux_i,
+            f_min=1./clpI.Pend, f_max=1./clpI.Pbeg,
+            delf=clpI.fstep, nbin=7, ncovers=3
+        )
+        
+        # Detectar picos
+        from scipy.signal import find_peaks
+        
+        fapLevels = np.array([0.1, 0.05, 0.01, 0.001])
+        plevels = clp.powerLevel(fapLevels)
+        plevelsI = clpI.powerLevel(fapLevels)
+        
+        peaksglsv, _ = find_peaks(clp.power, height=plevels[3], prominence=0.3 * np.max(clp.power), distance=90)
+        peaksglsi, _ = find_peaks(clpI.power, height=plevelsI[3], prominence=0.3 * np.max(clpI.power), distance=90)
+        peakspdmv, _ = find_peaks(-t1, prominence=0.28*(np.max(t1)-np.min(t1)), distance=90)
+        peakspdmi, _ = find_peaks(-t2, prominence=0.28*(np.max(t2)-np.min(t2)), distance=90)
+        
+        # Guardar resultados
+        sortglsv = np.argsort(clp.power[peaksglsv])[::-1][:30]
+        sortglsi = np.argsort(clpI.power[peaksglsi])[::-1][:30]
+        sortpdmv = np.argsort(t1[peakspdmv])[:30]
+        sortpdmi = np.argsort(t2[peakspdmi])[:30]
+        
+        freqsglsv = (clp.freq[peaksglsv])[sortglsv]
+        freqsglsi = (clpI.freq[peaksglsi])[sortglsi]
+        freqspdmv = (f1[peakspdmv])[sortpdmv]
+        freqspdmi = (f2[peakspdmi])[sortpdmi]
+        
+        # Guardar CSVs
+        pd.DataFrame({'freq': freqsglsv, 'period': 1./freqsglsv}).to_csv(
+            os.path.join(route, 'pglsv.csv'), index=False)
+        pd.DataFrame({'freq': freqsglsi, 'period': 1./freqsglsi}).to_csv(
+            os.path.join(route, 'pglsi.csv'), index=False)
+        pd.DataFrame({'freq': freqspdmv, 'period': 1./freqspdmv}).to_csv(
+            os.path.join(route, 'ppdmv.csv'), index=False)
+        pd.DataFrame({'freq': freqspdmi, 'period': 1./freqspdmi}).to_csv(
+            os.path.join(route, 'ppdmi.csv'), index=False)
+        
+        # Generar gráficos
+        generate_plots(clp, clpI, f1, t1, f2, t2, route)
+        
+        elapsed_time = t.time() - init_time
+        
+        return {
+            'star': star_name,
+            'status': 'success',
+            'time': elapsed_time,
+            'Best Peak GLS V': 1./clp.freq[np.argmax(clp.power)],
+            'Best Peak GLS I': 1./clpI.freq[np.argmax(clpI.power)],
+            'Best Minima PDM V': (1/f1)[np.argmin(t1)],
+            'Best Minima PDM I': (1/f2)[np.argmin(t2)]
+        }
+        
+    except Exception as e:
+        return {
+            'star': star_name,
+            'status': 'error',
+            'message': str(e),
+            'traceback': traceback.format_exc(),
+            'time': t.time() - init_time if 'init_time' in locals() else 0
+        }
+
+def generate_plots(clp, clpI, f1, t1, f2, t2, route):
+    """Genera los gráficos para una estrella"""
+    try:
+        fapLevels = np.array([0.1, 0.05, 0.01, 0.001])
+        plevels = clp.powerLevel(fapLevels)
+        plevelsI = clpI.powerLevel(fapLevels)
+        
+        hpp = 1./clp.freq[np.argmax(clp.power)]
+        hppI = 1./clpI.freq[np.argmax(clpI.power)]
+        periodpdmV = (1/f1)[np.argmin(t1)]
+        periodpdmI = (1/f2)[np.argmin(t2)]
+        
+        f, ax = plt.subplots(2, 2, figsize=(16, 12))
+        
+        # GLS V
+        ax[0,0].plot((1./clp.freq), clp.power, 'b.-', lw=1.2)
+        for i in range(len(fapLevels)):
+            ax[0,0].plot([min(1./clp.freq), max(1./clp.freq)], [plevels[i]]*2, '--')
+        ax[0,0].set_title("GLS and PDM $V$ filter")
+        ax[0,0].axvline(hpp, color='darkmagenta', linestyle='--', label=f'Period = {hpp:.5f} days')
+        ax[0,0].set_ylabel("Power")
+        ax[0,0].set_xlim(clp.Pbeg, clp.Pend)
+        ax[0,0].legend()
+        ax[0,0].set_xticklabels([])
+        
+        # GLS I
+        ax[0,1].plot((1./clpI.freq), clpI.power, 'b.-', lw=1.2)
+        for i in range(len(fapLevels)):
+            ax[0,1].plot([min(1./clpI.freq), max(1./clpI.freq)], [plevelsI[i]]*2, '--')
+        ax[0,1].set_title("GLS and PDM $I$ filter")
+        ax[0,1].axvline(hppI, color='darkmagenta', linestyle='--', label=f'Period = {hppI:.5f} days')
+        ax[0,1].set_ylabel("Power")
+        ax[0,1].set_xlim(clpI.Pbeg, clpI.Pend)
+        ax[0,1].legend()
+        ax[0,1].set_xticklabels([])
+        
+        # PDM V
+        periodo1 = (1/f1)
+        ax[1,0].plot(periodo1, t1, 'kp-', lw=1.2)
+        ax[1,0].axvline(periodpdmV, color='darkmagenta', linestyle='--', label=f'Period = {periodpdmV:.5f} days')
+        ax[1,0].set_xlabel("Period")
+        ax[1,0].set_ylabel(r"$\Theta$")
+        ax[1,0].set_xlim(clp.Pbeg, clp.Pend)
+        ax[1,0].legend()
+        
+        # PDM I
+        periodo2 = (1/f2)
+        ax[1,1].plot(periodo2, t2, 'kp-', lw=1.2)
+        ax[1,1].axvline(periodpdmI, color='darkmagenta', linestyle='--', label=f'Period = {periodpdmI:.5f} days')
+        ax[1,1].set_xlabel("Period")
+        ax[1,1].set_ylabel(r"$\Theta$")
+        ax[1,1].set_xlim(clpI.Pbeg, clpI.Pend)
+        ax[1,1].legend()
+        
+        plt.subplots_adjust(hspace=0)
+        plt.savefig(os.path.join(route, 'GLSPDM.png'))
+        plt.close()
+        
+    except Exception as e:
+        # Si falla la generación de gráficos, no interrumpir el análisis
+        pass
 
 def print_timer(message, start_time):
     """Función auxiliar para imprimir tiempos transcurridos"""
@@ -74,15 +273,21 @@ def pdm_with_covers_pypdm_like(time, flux, f_min, f_max, delf, nbin=10, ncovers=
 
 def main():
     script_start = t.time()
-    print("[TIMER] Iniciando script procesofull.py")
     
     # Configurar argumentos de línea de comandos
-    parser = argparse.ArgumentParser(description='Procesar análisis de estrellas')
+    parser = argparse.ArgumentParser(description='Procesar análisis de estrellas en paralelo')
     parser.add_argument('--data_folder', help='Ruta de la carpeta con los datos de las estrellas')
+    parser.add_argument('--workers', type=int, help='Número de procesos paralelos (auto-detecta si no se especifica)')
     
     args = parser.parse_args()
     
-    print_timer("Configuración inicial", script_start)
+    # Determinar número de workers
+    if args.workers:
+        num_workers = max(1, min(args.workers, 12))  # Límite de seguridad
+        print(f"Usando {num_workers} workers especificados por el usuario")
+    else:
+        num_workers = get_optimal_workers()
+        print(f"Auto-detectados {num_workers} workers óptimos")
     
     # Determinar carpeta de datos
     if args.data_folder:
@@ -91,300 +296,149 @@ def main():
         data = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion/data/analisis_20250722_180246'
 
     print(f"Carpeta de datos: {data}")
-    print("-" * 50)
     
     if not os.path.exists(data):
         print(f"ERROR: No se encontró la carpeta de datos: {data}")
         return
     
+    # Obtener lista de estrellas
     stars = [d for d in os.listdir(data) if os.path.isdir(os.path.join(data, d))]
     
     if not stars:
         print(f"ERROR: No se encontraron carpetas de estrellas en: {data}")
         return
     
-    print(f"Estrellas encontradas: {len(stars)}")
-    print(f"Total de estrellas a procesar: {len(stars)}")
-    print("-" * 50)
-    sys.stdout.flush()  # Forzar salida inmediata
+    total_stars = len(stars)
+    # Mensaje específico que la GUI puede detectar
+    print(f"Total de estrellas a procesar: {total_stars}")
+    print(f"Procesamiento paralelo con {num_workers} workers")
+    
+    # Preparar datos para procesamiento paralelo
+    star_data_list = [(data, star) for star in stars]
+    
+    # Contadores de resultados
+    successful_stars = 0
+    failed_stars = 0
+    results = []
     
     inicio_total = t.time()
     
-    for idx, star in enumerate(stars):
-        print(f"\nProcesando estrella {idx + 1}/{len(stars)}: {star}")
-        sys.stdout.flush()  # Forzar salida inmediata
-        route = os.path.join(data, star)
-        files = os.listdir(route)
-        star_number = int(star[4:]) 
-
-        fileV = next((f for f in files if f.endswith('V')), None)
-        fileI = next((f for f in files if f.endswith('i')), None)
-
-        if fileV and fileI:
-            print(f"Archivos encontrados: {fileV}, {fileI}")
-            sys.stdout.flush()
-            init_time = t.time()
+    try:
+        # Procesar estrellas en paralelo con progreso compatible para GUI
+        with ProcessPoolExecutor(max_workers=num_workers) as executor:
+            # Enviar todas las tareas
+            future_to_star = {
+                executor.submit(process_single_star, star_data): star_data[1] 
+                for star_data in star_data_list
+            }
             
-            try:
-                load_start = t.time()
-                print("Cargando datos...")
+            # Procesar resultados en orden de completación
+            completed_count = 0
+            for future in as_completed(future_to_star):
+                star_name = future_to_star[future]
+                completed_count += 1
+                
+                # Mensaje de progreso compatible con GUI - EXACTO formato esperado
+                print(f"Procesando estrella {completed_count}/{total_stars}")
                 sys.stdout.flush()
                 
-                dataV= np.loadtxt(os.path.join(route, fileV))
-                dataI= np.loadtxt(os.path.join(route, fileI))
-                load_time = print_timer("Carga de archivos", load_start)
-
-                prep_start = t.time()
-                dataredV=dataV[::2]
-                dataredI=dataI[::2]
-
-                time = dataV[:,0]
-                flux = dataV[:,1]
-
-                timeI = dataI[:,0]
-                fluxI = dataI[:,1]
+                try:
+                    result = future.result()
+                    results.append(result)
+                    
+                    if result['status'] == 'success':
+                        successful_stars += 1
+                        print(f"[OK] {star_name} completada exitosamente en {result['time']:.1f}s")
+                        sys.stdout.flush()
+                    else:
+                        failed_stars += 1
+                        print(f"[ERROR] Error en estrella {star_name}: {result.get('message', 'Error desconocido')}")
+                        sys.stdout.flush()
+                        
+                except Exception as e:
+                    failed_stars += 1
+                    print(f"[ERROR] Error crítico procesando {star_name}: {str(e)}")
+                    sys.stdout.flush()
+                    results.append({
+                        'star': star_name,
+                        'status': 'critical_error',
+                        'message': str(e),
+                        'time': 0
+                    })
                 
-                prep_time = print_timer("Preparación de datos", prep_start)
-
-                gls_start = t.time()
-                print("Ejecutando análisis GLS...")
-                sys.stdout.flush()
-                #------------------------------GLS-----------------------------------
-                Pend = 3
-                gls_v_start = t.time()
-                clp = pyPeriod.Gls((time, flux), norm="ZK", Pbeg=0.01, Pend=Pend)
-                gls_v_time = print_timer("GLS filtro V", gls_v_start)
+                # Mostrar progreso detallado más frecuentemente para mejor UX
+                # Para datasets pequeños (<=20): mostrar cada estrella completada
+                # Para datasets medianos (21-100): mostrar cada 2-3 estrellas
+                # Para datasets grandes (>100): mostrar cada 5% o mínimo cada 5 estrellas
+                mostrar_progreso = False
+                if total_stars <= 20:
+                    mostrar_progreso = True  # Mostrar cada estrella para datasets pequeños
+                elif total_stars <= 100:
+                    mostrar_progreso = (completed_count % 2 == 0) or (completed_count == total_stars)
+                else:
+                    intervalo = max(5, total_stars // 20)  # Mínimo cada 5 estrellas, máximo cada 5%
+                    mostrar_progreso = (completed_count % intervalo == 0) or (completed_count == total_stars)
                 
-                fapLevels = np.array([0.1, 0.05, 0.01, 0.001])
-                plevels = clp.powerLevel(fapLevels)
-
-                ifmax = np.argmax(clp.power)
-
-                pmax = clp.power[ifmax]
-                fmax = clp.freq[ifmax]
-
-                hpp = 1./fmax
-
-                freqstep=clp.fstep
-                periodos= (1./clp.freq)
-                power=clp.power
-
-                gls_i_start = t.time()
-                clpI = pyPeriod.Gls((timeI, fluxI), norm="ZK", Pbeg=0.01, Pend=Pend)
-                gls_i_time = print_timer("GLS filtro I", gls_i_start)
-
-                fapLevelsI = np.array([0.1, 0.05, 0.01, 0.001])
-                plevelsI = clpI.powerLevel(fapLevels)
-                ifmaxI = np.argmax(clpI.power)
-
-                pmaxI = clpI.power[ifmaxI]
-                fmaxI = clpI.freq[ifmaxI]
-
-                hppI = 1./fmaxI
-
-                freqstepI=clpI.fstep
-                periodosI= (1./clpI.freq)
-                powerI=clpI.power
-
-                gls_total_time = print_timer("GLS total", gls_start)
-
-                pdm_start = t.time()
-                print("Ejecutando análisis PDM...")
-                sys.stdout.flush()
-                
-                #-----------------------------PDM--------------------------------------
-                pdm_v_start = t.time()
-                """S = pyPDM.Scanner(minVal=(1./clp.Pend), maxVal=(1./clp.Pbeg), dVal=freqstep, mode="frequency")
-                P = pyPDM.PyPDM(time, flux)
-
-                f1, t1 = P.pdmEquiBinCover(7, 3, S)
-                """
-                f1, t1 = pdm_with_covers_pypdm_like(time, flux, f_min=1./clp.Pend, f_max=1./clp.Pbeg, delf=freqstep, nbin=7, ncovers=3)
-                thetmin1= np.min(t1)
-                periodpdmV = (1/f1)[np.argmin(t1)]
-                
-                pdm_v_time = print_timer("PDM filtro V", pdm_v_start)
-
-                equis= np.linspace(0, 10.0, 2)
-                lequis=np.array([thetmin1 for i in range(len(equis))])
-
-                periodo1 = (1/f1)
-
-                pdm_i_start = t.time()
-                """SI = pyPDM.Scanner(minVal=(1./clpI.Pend), maxVal=(1./clpI.Pbeg), dVal=freqstepI, mode="frequency")
-                PI = pyPDM.PyPDM(timeI,  fluxI)
-
-                f2, t2 = PI.pdmEquiBinCover(7, 3, SI)"""
-                f2, t2 = pdm_with_covers_pypdm_like(timeI, fluxI, f_min=1./clpI.Pend, f_max=1./clpI.Pbeg, delf=freqstepI, nbin=7, ncovers=3)
-                thetmin2=np.min(t2)
-                periodpdmI = (1/f2)[np.argmin(t2)]
-                
-                pdm_i_time = print_timer("PDM filtro I", pdm_i_start)
-
-                equisI= np.linspace(0, 10.0, 2)
-                lequisI=np.array([thetmin2 for i in range(len(equisI))])
-
-                periodo2 = (1/f2)
-
-                pdm_total_time = print_timer("PDM total", pdm_start)
-
-                peaks_start = t.time()
-                print("Detectando picos de frecuencia...")
-                sys.stdout.flush()
-                #-----------------------------Frequency Peaks--------------------------------------
-                from scipy.signal import find_peaks
-
-                peaksglsv, _ = find_peaks(clp.power, height=plevels[3], prominence=0.3 * np.max(clp.power), distance=90)
-                peaksglsi, _ = find_peaks(clpI.power, height=plevelsI[3], prominence=0.3 * np.max(clp.power), distance=90)
-
-                peakspdmv, _ = find_peaks(-t1, prominence= 0.28*(np.max(t1)-np.min(t1)), distance=90)
-                peakspdmi, _ = find_peaks(-t2, prominence= 0.28*(np.max(t2)-np.min(t2)), distance=90)
-                
-                peakperiodsv = 1./clp.freq[peaksglsv]
-                peakperiodsi = 1./clpI.freq[peaksglsi]
-
-                pdmperiodsv = 1./f1[peakspdmv]
-                pdmperiodsi = 1./f2[peakspdmi]
-
-                peaks_time = print_timer("Detección de picos", peaks_start)
-
-                save_start = t.time()
-                print("Organizando y guardando resultados...")
-                sys.stdout.flush()
-                #---sort---
-                sortglsv = np.argsort(clp.power[peaksglsv])[::-1][:30]
-                sortglsi = np.argsort(clpI.power[peaksglsi])[::-1][:30]
-                sortpdmv = np.argsort(t1[peakspdmv])[:30]
-                sortpdmi = np.argsort(t2[peakspdmi])[:30]
-
-                freqsglsv = (clp.freq[peaksglsv])[sortglsv]
-                freqsglsi = (clpI.freq[peaksglsi])[sortglsi]
-                freqspdmv = (f1[peakspdmv])[sortpdmv]
-                freqspdmi = (f2[peakspdmi])[sortpdmi]
-
-                perglsv = 1./freqsglsv
-                perglsi = 1./freqsglsi
-                perpdmv = 1./freqspdmv
-                perpdmi = 1./freqspdmi
-
-                #guardar los peaks en cada caso
-                df = pd.DataFrame({'freq': freqsglsv, 'period': perglsv})
-                df.to_csv(os.path.join(route,'pglsv.csv'), index=False)
-
-                df2 = pd.DataFrame({'freq': freqsglsi, 'period': perglsi})
-                df2.to_csv(os.path.join(route,'pglsi.csv'), index=False)
-
-                df3 = pd.DataFrame({'freq': freqspdmv, 'period': perpdmv})
-                df3.to_csv(os.path.join(route,'ppdmv.csv'), index=False)
-
-                df4 = pd.DataFrame({'freq': freqspdmi, 'period': perpdmi})
-                df4.to_csv(os.path.join(route,'ppdmi.csv'), index=False)
-
-                save_time = print_timer("Guardado de CSVs", save_start)
-
-                peakspowerv = clp.power[peaksglsv]
-                peakspoweri = clpI.power[peaksglsi]
-
-                minimav = t1[peakspdmv]
-                minimai = t2[peakspdmi]
-
-                #Los Peaks del GLS son hpp y hppI
-                print(f'Best Peak GLS V: {hpp}')
-                print(f'Best Peak GLS I: {hppI}')
-                print(f'Best Minima PDM V: {periodpdmV}')
-                print(f'Best Minima PDM I: {periodpdmI}')
-
-                plot_start = t.time()
-                print("Generando gráficos...")
-                sys.stdout.flush()
-                #-----------------------------Plots---------------------------------------
-                f, ax = plt.subplots(2, 2, figsize=(16, 12))
-
-                ax[0,0].plot((1./clp.freq), clp.power, 'b.-', lw=1.2)
-                #ax[0,0].plot(peakperiodsv, peakspowerv, 'rx', markersize=10, label='Detected Peaks')
-                for i in range(len(fapLevels)):
-                    ax[0,0].plot([min(1./clp.freq), max(1./clp.freq)], [plevels[i]]*2, '--')
-                ax[0,0].set_title("GLS and PDM $V$ filter")
-                ax[0,0].axvline(hpp, color='darkmagenta', linestyle='--', label=f'Period = {hpp:.5f} days')
-                ax[0,0].set_ylabel("Power")
-                ax[0,0].set_xlim(clp.Pbeg,clp.Pend)
-                ax[0,0].legend()
-                ax[0,0].set_xticklabels([])
-
-                ax[0,1].plot((1./clpI.freq), clpI.power, 'b.-', lw=1.2)
-                #ax[0,1].plot(peakperiodsi, peakspoweri, 'rx', markersize=10, label='Detected Peaks')
-                for i in range(len(fapLevels)):
-                    ax[0,1].plot([min(1./clpI.freq), max(1./clpI.freq)], [plevelsI[i]]*2, '--')
-                ax[0,1].set_title("GLS and PDM $I$ filter")
-                ax[0,1].axvline(hppI, color='darkmagenta', linestyle='--', label=f'Period = {hppI:.5f} days')
-                ax[0,1].set_ylabel("Power")
-                ax[0,1].set_xlim(clpI.Pbeg,clpI.Pend)
-                ax[0,1].legend()
-                ax[0,1].set_xticklabels([])
-
-                ax[1,0].plot(periodo1, t1, 'kp-', lw=1.2)
-                #ax[1,0].plot(pdmperiodsv, minimav, 'rx', markersize=10, label='Detected Minima')
-                ax[1,0].plot(equis, lequis, color='black', linestyle='--')
-                ax[1,0].axvline(periodpdmV, color='darkmagenta', linestyle='--', label=f'Period = {periodpdmV:.5f} days')
-                ax[1,0].set_xlabel("Period")
-                ax[1,0].set_ylabel(r"$\Theta$")
-                ax[1,0].set_xlim(clp.Pbeg,clp.Pend) 
-                ax[1,0].legend()
-
-                ax[1,1].plot(periodo2, t2, 'kp-', lw=1.2)
-                #ax[1,1].plot(pdmperiodsi, minimai, 'rx', markersize=10, label='Detected Minima')
-                ax[1,1].plot(equisI, lequisI, color='black', linestyle='--')
-                ax[1,1].axvline(periodpdmI, color='darkmagenta', linestyle='--', label=f'Period = {periodpdmI:.5f} days')
-                ax[1,1].set_xlabel("Period")
-                ax[1,1].set_ylabel(r"$\Theta$")
-                ax[1,1].set_xlim(clpI.Pbeg,clpI.Pend)
-                ax[1,1].legend()
-
-                plt.subplots_adjust(hspace=0)
-                figname1 = 'GLSPDM.png'
-                figrute1 = os.path.join(route, figname1)
-                #figname2 = 'GLSPDM.pdf'
-                #figrute2 = os.path.join(route, figname2)
-                plt.savefig(figrute1)
-                #plt.savefig(figrute2)
-                plt.close()
-                
-                plot_time = print_timer("Generación de gráficos", plot_start)
-                
-                end_time = t.time()  # End timing
-                elapsed_time = (end_time - init_time) / 60  # Convert to minutes
-                
-                # Resumen de tiempos por estrella
-                print(f"\n=== RESUMEN DE TIEMPOS ESTRELLA {star_number} ===")
-                print(f"Tiempo total de análisis: {elapsed_time:.2f} minutos")
-                star_total_seconds = end_time - init_time
-                print(f"[TIMER] Carga datos: {((load_time - load_start) / star_total_seconds * 100):.1f}%")
-                print(f"[TIMER] GLS: {((gls_total_time - gls_start) / star_total_seconds * 100):.1f}%")
-                print(f"[TIMER] PDM: {((pdm_total_time - pdm_start) / star_total_seconds * 100):.1f}%")
-                print(f"[TIMER] Picos: {((peaks_time - peaks_start) / star_total_seconds * 100):.1f}%")
-                print(f"[TIMER] Gráficos: {((plot_time - plot_start) / star_total_seconds * 100):.1f}%")
-                print(f"=====================================\n")
-                
-                print(f'Estrella {star_number} completada exitosamente')
-                sys.stdout.flush()
-                
-            except Exception as e:
-                end_time = t.time()
-                elapsed_time = (end_time - init_time) / 60
-                print(f'Error procesando estrella {star_number}: {str(e)}')
-                print(f'Tiempo transcurrido antes del error: {elapsed_time:.2f} minutos')
-                sys.stdout.flush()
-        else:
-            print(f'Archivos faltantes para estrella {star_number}: V={fileV}, I={fileI}')
-            sys.stdout.flush()
+                if mostrar_progreso:
+                    porcentaje = (completed_count / total_stars) * 100
+                    print(f"Progreso: {completed_count}/{total_stars} ({porcentaje:.1f}%) - Exitosas: {successful_stars}, Fallidas: {failed_stars}")
+                    sys.stdout.flush()
     
+    except KeyboardInterrupt:
+        print("ADVERTENCIA: Procesamiento interrumpido por el usuario")
+        return
+    except Exception as e:
+        print(f"ERROR: Error crítico en el procesamiento paralelo: {str(e)}")
+        return
+    
+    # Calcular estadísticas finales
     fin_total = t.time()
     tiempo_total = (fin_total - inicio_total) / 60
-    print("-" * 50)
-    print(f"Procesamiento completado para {len(stars)} estrellas")
-    print(f"Tiempo total: {tiempo_total:.2f} minutos")
-    print("-" * 50)
-    sys.stdout.flush()
+    
+    # Estadísticas de tiempo
+    successful_results = [r for r in results if r['status'] == 'success']
+    if successful_results:
+        times = [r['time'] for r in successful_results]
+        avg_time_per_star = np.mean(times)
+        total_processing_time = np.sum(times)
+        speedup = total_processing_time / tiempo_total if tiempo_total > 0 else 1
+    else:
+        avg_time_per_star = 0
+        total_processing_time = 0
+        speedup = 1
+    
+    # Imprimir resumen final compatible con GUI
+    print("=" * 70)
+    print("=== RESUMEN FINAL ===")
+    print(f"Total de estrellas: {total_stars}")
+    print(f"Procesadas exitosamente: {successful_stars}")
+    print(f"Fallidas: {failed_stars}")
+    print(f"Tasa de éxito: {(successful_stars/total_stars)*100:.1f}%")
+    print(f"Tiempo total de ejecución: {tiempo_total:.2f} minutos")
+    print(f"Tiempo promedio por estrella: {avg_time_per_star:.2f} segundos")
+    print(f"Speedup logrado: {speedup:.1f}x")
+    print(f"Workers utilizados: {num_workers}")
+    print("=" * 70)
+    
+    # Guardar reporte detallado
+    try:
+        report_df = pd.DataFrame(results)
+        report_path = os.path.join(data, 'Best_Peak_GLS_Min_PDM.csv')
+        report_df.to_csv(report_path, index=False)
+        print(f"Reporte detallado guardado en: {report_path}")
+    except Exception as e:
+        print(f"ADVERTENCIA: No se pudo guardar el reporte: {str(e)}")
+    
+    # Mostrar estrellas fallidas si las hay
+    if failed_stars > 0:
+        print(f"\nEstrellas fallidas ({failed_stars}):")
+        failed_results = [r for r in results if r['status'] != 'success']
+        for result in failed_results[:10]:  # Mostrar solo las primeras 10
+            print(f"  - {result['star']}: {result.get('message', 'Error desconocido')}")
+        if len(failed_results) > 10:
+            print(f"  ... y {len(failed_results) - 10} más")
+    
+    print("Procesamiento completado.")
 
 if __name__ == "__main__":
     main()

@@ -1256,7 +1256,6 @@ class DatosF(QMainWindow):
                 )
                 self.image_label.setPixmap(scaled_pixmap)
                 self.image_label.setText("")
-                print(f"Mostrando imagen de estrella {imagen_info['estrella']}: {imagen_info['nombre']}")
             else:
                 self.image_label.setText(f"Error al cargar imagen de estrella {imagen_info['estrella']}")
         except Exception as e:
@@ -1293,7 +1292,6 @@ class DatosF(QMainWindow):
                 # Hacer scroll para que la fila sea visible
                 self.table_main.scrollToItem(item)
                 
-                print(f"Fila seleccionada: {row + 1} (Estrella {numero_estrella})")
                 break
 
     def actualizar_controles_navegacion(self):

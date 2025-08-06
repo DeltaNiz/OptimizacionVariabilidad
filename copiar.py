@@ -30,10 +30,8 @@ def main():
     else:
         data = os.path.join(ruta_base, 'data')
     
-    print(f"=== COPIAR ARCHIVOS ===")
     print(f"CSV fuente: {archivo_csv}")
     print(f"Destino: {data}")
-    print("-" * 40)
     
     # Leer el CSV
     try:
@@ -78,11 +76,10 @@ def main():
             print(f"Archivo no encontrado: {src2}")
             archivos_no_encontrados += 1
     
-    print("-" * 40)
-    print(f" Proceso completado")
-    print(f" Carpetas creadas: {len(df)}")
-    print(f" Archivos copiados: {archivos_copiados}")
-    print(f" Archivos no encontrados: {archivos_no_encontrados}")
+    print(f"Proceso completado")
+    print(f"Carpetas creadas: {len(df)}")
+    print(f"Archivos copiados: {archivos_copiados}")
+    print(f"Archivos no encontrados: {archivos_no_encontrados}")
 
 if __name__ == "__main__":
     main()

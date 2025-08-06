@@ -29,15 +29,20 @@ class AppConstants:
     
     # Palabras clave para detección de fases
     KEYWORDS_ARCHIVO = ["leyendo archivo", "archivo procesado", "gls", "pdm", "período"]
-    KEYWORDS_PROCESAMIENTO = ["procesando estrella", "analizando estrella"]
+    KEYWORDS_PROCESAMIENTO = ["procesando estrella", "analizando estrella", "completada exitosamente"]
     
     # Patrones regex precompilados para mejor rendimiento
     REGEX_PATTERNS = {
         'total_estrellas': re.compile(r'Total de estrellas a procesar:\s*(\d+)'),
         'procesando_estrella': re.compile(r'Procesando estrella (\d+)/(\d+)'),
+        'progreso_detallado': re.compile(r'Progreso:\s*(\d+)/(\d+)\s*\(([\d.]+)%\)\s*-\s*Exitosas:\s*(\d+),\s*Fallidas:\s*(\d+)'),
+        'estrella_completada': re.compile(r'\[OK\] (\w+) completada exitosamente en ([\d.]+)s'),
+        'estrella_error': re.compile(r'\[ERROR\] Error en estrella (\w+):'),
         'numero_estrella': re.compile(r'estrella[:\s]+(\d+)', re.IGNORECASE),
         'archivo_estrella': re.compile(r'\b(\d+\.(txt|dat))\b'),
-        'archivo_numero': re.compile(r'\b\d+\.(txt|dat)\b')
+        'archivo_numero': re.compile(r'\b\d+\.(txt|dat)\b'),
+        'procesamiento_completado': re.compile(r'Procesamiento completado\.'),
+        'resumen_final': re.compile(r'=== RESUMEN FINAL ===')
     }
 
 class VentanaProgreso(QDialog):
@@ -149,18 +154,23 @@ class VentanaProgreso(QDialog):
             porcentaje_estrellas = (actual / total) * AppConstants.PROGRESO_ESTRELLAS
             porcentaje_total = AppConstants.PROGRESO_BASE + porcentaje_estrellas
             
-            self.progress_bar.setValue(int(porcentaje_total))
+            # Asegurar que no exceda 100%
+            porcentaje_total = min(100, int(porcentaje_total))
+            self.progress_bar.setValue(porcentaje_total)
             
-            # Determinar el texto del estado basado en si es completado o en progreso
+            # Texto más claro del estado
             if actual == 0:
-                self.label_estado.setText(f"Procesando estrella 0/{total}")
+                self.label_estado.setText(f"Iniciando procesamiento de {total} estrellas...")
             elif actual == total:
-                self.label_estado.setText(f"Completadas {actual}/{total} estrellas")
+                self.label_estado.setText(f"[OK] Completadas todas las estrellas ({actual}/{total})")
+                # Asegurar 100% cuando se completan todas
+                self.progress_bar.setValue(100)
             else:
-                self.label_estado.setText(f"Procesando estrella {actual + 1}/{total}")
+                self.label_estado.setText(f"Procesando estrellas: {actual}/{total} completadas")
             
-            # Mantener el label de progreso de estrellas vacío
-            self.label_progreso_estrellas.setText("")
+            # Mostrar porcentaje en el label de progreso de estrellas
+            porcentaje_estrellas_display = (actual / total) * 100
+            self.label_progreso_estrellas.setText(f"{porcentaje_estrellas_display:.1f}% ({actual}/{total})")
         QApplication.processEvents()
         
     def actualizar_fase_analisis(self, fase, porcentaje_base=0):
@@ -489,7 +499,7 @@ class WorkerThread(QThread):
                     linea = output.strip()
                     self.log_agregado.emit(linea)
                     
-                    # Detectar total de estrellas al inicio usando regex precompilada
+                    # Detectar total de estrellas al inicio
                     if "Total de estrellas a procesar:" in linea:
                         try:
                             match = AppConstants.REGEX_PATTERNS['total_estrellas'].search(linea)
@@ -498,103 +508,133 @@ class WorkerThread(QThread):
                                 if not analisis_iniciado:
                                     self.progreso_estrellas.emit(0, total_estrellas)
                                     analisis_iniciado = True
-                        except:
-                            pass
+                                    self.detalle_cambiado.emit(f"Iniciando procesamiento de {total_estrellas} estrellas...")
+                        except Exception as e:
+                            self.log_agregado.emit(f"[ERROR] Error parseando total de estrellas: {e}")
                     
-                    # Detectar progreso con formato "Procesando estrella X/Y"
-                    elif AppConstants.REGEX_PATTERNS['procesando_estrella'].search(linea):
+                    # PRIORIDAD 1: Detectar progreso detallado con estadísticas (más confiable para paralelo)
+                    elif "Progreso:" in linea and "Exitosas:" in linea:
+                        try:
+                            match = AppConstants.REGEX_PATTERNS['progreso_detallado'].search(linea)
+                            if match:
+                                actual = int(match.group(1))
+                                total = int(match.group(2))
+                                porcentaje = float(match.group(3))
+                                exitosas = int(match.group(4))
+                                fallidas = int(match.group(5))
+                                
+                                if total_estrellas == 0:
+                                    total_estrellas = total
+                                    analisis_iniciado = True
+                                
+                                # Actualizar progreso con el número REAL de estrellas completadas
+                                self.progreso_estrellas.emit(actual, total)
+                                self.detalle_cambiado.emit(f"Completadas: {exitosas}, Fallidas: {fallidas} ({porcentaje:.1f}%)")
+                                
+                        except Exception as e:
+                            self.log_agregado.emit(f"[ERROR] Error parseando progreso detallado: {e}")
+                    
+                    # PRIORIDAD 2: Detectar estrella completada (incrementar contador local)
+                    elif "[OK] Estrella" in linea and "completada exitosamente" in linea:
+                        try:
+                            match = AppConstants.REGEX_PATTERNS['estrella_completada'].search(linea)
+                            if match:
+                                estrella_nombre = match.group(1)
+                                tiempo = match.group(2)
+                                self.detalle_cambiado.emit(f"[OK] {estrella_nombre} completada en {tiempo}s")
+                                
+                                # Incrementar contador local de estrellas procesadas
+                                estrellas_procesadas += 1
+                                if total_estrellas > 0:
+                                    self.progreso_estrellas.emit(estrellas_procesadas, total_estrellas)
+                            else:
+                                # Fallback sin regex - solo incrementar contador
+                                estrellas_procesadas += 1
+                                if total_estrellas > 0:
+                                    self.progreso_estrellas.emit(estrellas_procesadas, total_estrellas)
+                                self.detalle_cambiado.emit("[OK] Estrella completada exitosamente")
+                                
+                        except Exception as e:
+                            self.log_agregado.emit(f"[ERROR] Error parseando estrella completada: {e}")
+                    
+                    # PRIORIDAD 3: Detectar progreso con formato "Procesando estrella X/Y" (solo para inicialización)
+                    elif "Procesando estrella" in linea and not analisis_iniciado:
                         try:
                             match = AppConstants.REGEX_PATTERNS['procesando_estrella'].search(linea)
-                            actual = int(match.group(1))
-                            total = int(match.group(2))
-                            total_estrellas = total
-                            
-                            # actual-1 porque representa estrellas completadas, no la que se está procesando
-                            self.progreso_estrellas.emit(actual - 1, total)
-                            analisis_iniciado = True
-                        except:
-                            pass
-                    
-                    # Detectar estrella individual siendo procesada
-                    elif AppConstants.REGEX_PATTERNS['numero_estrella'].search(linea):
-                        try:
-                            match = AppConstants.REGEX_PATTERNS['numero_estrella'].search(linea)
-                            numero_estrella = match.group(1)
-                            if "procesando" in linea.lower() or "analizando" in linea.lower():
-                                self.detalle_cambiado.emit(f"Estrella actual: {numero_estrella}")
-                                
-                                # Si sabemos el total, actualizar progreso basado en el número de estrella
-                                if total_estrellas > 0:
-                                    try:
-                                        estrella_num = int(numero_estrella)
-                                        # Calcular progreso basado en la estrella actual
-                                        estrellas_procesadas = max(1, estrella_num)  # Al menos 1
-                                        self.progreso_estrellas.emit(estrellas_procesadas, total_estrellas)
-                                    except:
-                                        pass
-                            elif "leyendo" in linea.lower() or "archivo" in linea.lower():
-                                self.detalle_cambiado.emit(f"Leyendo datos estrella {numero_estrella}")
-                        except:
-                            pass
-                    
-                    # Detectar nombres de archivos siendo procesados
-                    elif re.search(r'\b\d+\.(txt|dat)\b', linea):
-                        try:
-                            match = re.search(r'\b(\d+\.(txt|dat))\b', linea)
                             if match:
-                                archivo = match.group(1)
-                                numero = archivo.split('.')[0]
-                                self.detalle_cambiado.emit(f"Procesando archivo estrella {numero}")
-                        except:
-                            pass
+                                actual = int(match.group(1))
+                                total = int(match.group(2))
+                                
+                                if total_estrellas == 0:
+                                    total_estrellas = total
+                                    analisis_iniciado = True
+                                    # Solo inicializar, no actualizar progreso aquí
+                                    self.progreso_estrellas.emit(0, total)
+                                    self.detalle_cambiado.emit(f"Iniciando procesamiento de {total} estrellas...")
+                                
+                        except Exception as e:
+                            self.log_agregado.emit(f"[ERROR] Error parseando progreso de estrella: {e}")
+                    
+                    # Detectar errores en estrellas (incrementar contador también)
+                    elif "✗ Error en estrella" in linea:
+                        try:
+                            match = AppConstants.REGEX_PATTERNS['estrella_error'].search(linea)
+                            if match:
+                                estrella_nombre = match.group(1)
+                                self.detalle_cambiado.emit(f"✗ Error en {estrella_nombre}")
+                            else:
+                                # Fallback sin regex
+                                self.detalle_cambiado.emit("✗ Error en procesamiento de estrella")
+                            
+                            # Incrementar contador local (estrella fallida también cuenta como procesada)
+                            estrellas_procesadas += 1
+                            if total_estrellas > 0:
+                                self.progreso_estrellas.emit(estrellas_procesadas, total_estrellas)
+                                
+                        except Exception as e:
+                            self.log_agregado.emit(f"[ERROR] Error parseando error de estrella: {e}")
+                    
+                    # Detectar resumen final
+                    elif "=== RESUMEN FINAL ===" in linea:
+                        self.detalle_cambiado.emit("Generando resumen final...")
+                    
+                    # Detectar procesamiento completado
+                    elif "Procesamiento completado." in linea:
+                        if total_estrellas > 0:
+                            self.progreso_estrellas.emit(total_estrellas, total_estrellas)
+                        self.estado_cambiado.emit("¡Análisis completado exitosamente!", 100)
+                        self.detalle_cambiado.emit("Procesamiento completado")
                     
                     # Detectar fases específicas del análisis
-                    elif "GLS" in linea and ("ejecut" in linea.lower() or "anali" in linea.lower()):
+                    elif "Ejecutando análisis GLS" in linea:
                         self.detalle_cambiado.emit("Ejecutando análisis GLS...")
-                    elif "PDM" in linea and ("ejecut" in linea.lower() or "anali" in linea.lower()):
+                    elif "Ejecutando análisis PDM" in linea:
                         self.detalle_cambiado.emit("Ejecutando análisis PDM...")
-                    elif "gráfico" in linea.lower() or "plot" in linea.lower() or "visualiz" in linea.lower():
-                        self.detalle_cambiado.emit("Generando visualizaciones...")
-                    elif "guardando" in linea.lower() or "exportando" in linea.lower():
+                    elif "Generando visualizaciones" in linea:
+                        self.detalle_cambiado.emit("Generando gráficos...")
+                    elif "Guardando resultados" in linea:
                         self.detalle_cambiado.emit("Guardando resultados...")
+                    elif "Reporte detallado guardado" in linea:
+                        self.detalle_cambiado.emit("Guardando reporte detallado...")
                     
-                    elif "completada exitosamente" in linea or "completado exitosamente" in linea:
-                        # Actualizar progreso cuando se completa una estrella
-                        if total_estrellas > 0:
-                            estrellas_procesadas += 1
-                            # Usar la señal progreso_estrellas para actualizar correctamente
-                            self.progreso_estrellas.emit(estrellas_procesadas, total_estrellas)
-                            self.detalle_cambiado.emit(f"✓ Estrella completada ({estrellas_procesadas}/{total_estrellas})")
-                    
-                    elif "Procesamiento completado" in linea or "Análisis completado" in linea:
-                        # Finalización completa - usar señal estado_cambiado
-                        self.estado_cambiado.emit("¡Análisis completado exitosamente!", 100)
-                    
-                    # Detectar inicio de análisis de cualquier estrella para forzar actualización
-                    elif ("iniciando" in linea.lower() or "comenzando" in linea.lower()) and "estrella" in linea.lower():
-                        if total_estrellas > 0 and not analisis_iniciado:
-                            self.progreso_estrellas.emit(0, total_estrellas)
-                            analisis_iniciado = True
-                    
-                    # Si detectamos alguna línea que sugiere que ya hay al menos 1 estrella procesándose
-                    elif total_estrellas == 0 and ("procesando estrella" in linea.lower() or "analizando estrella" in linea.lower()):
-                        # Asumir al menos 1 estrella si no se detectó el total antes
-                        total_estrellas = 1
-                        self.progreso_estrellas.emit(1, 1)
-                        analisis_iniciado = True
-                    
-                    # Detectar cualquier indicador de que el procesamiento de estrellas ya comenzó
-                    elif any(keyword in linea.lower() for keyword in AppConstants.KEYWORDS_ARCHIVO) and total_estrellas > 0:
+                    # Detectar inicio de procesamiento si no se detectó el total antes
+                    elif "procesamiento" in linea.lower() and total_estrellas == 0:
+                        self.detalle_cambiado.emit("Iniciando procesamiento...")
                         if not analisis_iniciado:
-                            self.progreso_estrellas.emit(1, total_estrellas)
+                            # Asumir al menos 1 estrella para mostrar progreso
+                            total_estrellas = 1
+                            self.progreso_estrellas.emit(0, 1)
                             analisis_iniciado = True
                     
-                    # Detectar si procesofull.py ya está ejecutándose con estrellas
-                    elif "procesofull.py" in linea.lower() and total_estrellas == 0:
-                        # Si no hemos detectado total pero procesofull está corriendo, asumir al menos 1
-                        total_estrellas = 1
-                        self.progreso_estrellas.emit(0, 1)
-                        analisis_iniciado = True
+                    # Fallback: si vemos cualquier mención de estrellas pero no hemos iniciado análisis
+                    elif not analisis_iniciado and ("estrella" in linea.lower() or "star" in linea.lower()):
+                        if AppConstants.DEBUG_MODE:
+                            self.log_agregado.emit(f"[DEBUG] Fallback - detectando mención de estrella: '{linea}'")
+                        if total_estrellas == 0:
+                            total_estrellas = 1  # Asumir al menos una estrella
+                            self.progreso_estrellas.emit(0, 1)
+                            analisis_iniciado = True
+                            self.detalle_cambiado.emit("Iniciando análisis de estrellas...")
             
             rc = self.proceso_actual.poll()
             
@@ -786,8 +826,8 @@ def realizar_analisis_completo(table_main, table_descartadas, datos_formulario):
                         
                         QTimer.singleShot(1000, quitar_always_on_top)  # Quitar después de 1 segundo
                         
-                        print(f"✓ Ventana DatosF abierta exitosamente con datos de: {worker.data_folder_final}")
-                        print(f"✓ CSV filtrado en: {worker.ruta_csv_generado if hasattr(worker, 'ruta_csv_generado') else 'No especificado'}")
+                        print(f"[OK] Ventana DatosF abierta exitosamente con datos de: {worker.data_folder_final}")
+                        print(f"[OK] CSV filtrado en: {worker.ruta_csv_generado if hasattr(worker, 'ruta_csv_generado') else 'No especificado'}")
                         
                         # Guardar referencia para evitar que se cierre automáticamente
                         if not hasattr(app, '_ventana_resultados'):
@@ -796,7 +836,7 @@ def realizar_analisis_completo(table_main, table_descartadas, datos_formulario):
                         
                         # Actualizar resultado final con mensaje de éxito de DatosF
                         resultado_final[0] = True
-                        resultado_final[1] = f"✓ Ventana DatosF abierta exitosamente con datos de: {worker.data_folder_final}"
+                        resultado_final[1] = f"[OK] Ventana DatosF abierta exitosamente con datos de: {worker.data_folder_final}"
                         
                         # Cerrar automáticamente la ventana de progreso después de un breve retraso
                         from PyQt5.QtCore import QTimer
