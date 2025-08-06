@@ -224,10 +224,13 @@ class WorkerThread(QThread):
         self.cancelacion_forzada = False
         self.data_folder_final = None  # Para guardar la ruta final de los datos
         self.ruta_csv_generado = None  # Para guardar la ruta del CSV filtrado generado
+        self.ruta_csv_temporal = None  # Para rastrear el CSV temporal y poder eliminarlo
+        self.carpeta_analisis_creada = None  # Para rastrear la carpeta de análisis y poder eliminarla
         
     def forzar_cancelacion(self):
         """Fuerza la cancelación inmediata"""
         self.cancelacion_forzada = True
+        self._limpiar_archivos_temporales()
         if self.proceso_actual and self.proceso_actual.poll() is None:
             try:
                 self.proceso_actual.kill()  # Terminación inmediata
@@ -237,6 +240,7 @@ class WorkerThread(QThread):
         
     def cancelar(self):
         """Cancela el proceso actual"""
+        self._limpiar_archivos_temporales()
         if self.proceso_actual and self.proceso_actual.poll() is None:
             try:
                 # Intentar terminación suave primero
@@ -264,6 +268,42 @@ class WorkerThread(QThread):
                 self.log_agregado.emit("Proceso terminado forzosamente")
         except:
             pass
+    
+    def _limpiar_archivos_temporales(self):
+        """Limpia archivos temporales y carpetas creadas durante el análisis (para cancelaciones)"""
+        archivos_eliminados = 0
+        
+        # Limpiar CSV temporal
+        if self.ruta_csv_temporal and os.path.exists(self.ruta_csv_temporal):
+            try:
+                os.remove(self.ruta_csv_temporal)
+                self.log_agregado.emit(f"Archivo CSV temporal eliminado: {os.path.basename(self.ruta_csv_temporal)}")
+                archivos_eliminados += 1
+            except Exception as e:
+                self.log_agregado.emit(f"No se pudo eliminar archivo temporal: {e}")
+        
+        # Limpiar carpeta de análisis si fue creada
+        if self.carpeta_analisis_creada and os.path.exists(self.carpeta_analisis_creada):
+            try:
+                import shutil
+                shutil.rmtree(self.carpeta_analisis_creada)
+                nombre_carpeta = os.path.basename(self.carpeta_analisis_creada)
+                self.log_agregado.emit(f"Carpeta de análisis eliminada: {nombre_carpeta}")
+                archivos_eliminados += 1
+            except Exception as e:
+                self.log_agregado.emit(f"No se pudo eliminar carpeta de análisis: {e}")
+        
+        if archivos_eliminados > 0:
+            self.log_agregado.emit(f"Limpieza completada: {archivos_eliminados} elemento(s) eliminado(s)")
+    
+    def _limpiar_solo_csv_temporal(self):
+        """Limpia solo el CSV temporal (para finalizaciones exitosas)"""
+        if self.ruta_csv_temporal and os.path.exists(self.ruta_csv_temporal):
+            try:
+                os.remove(self.ruta_csv_temporal)
+                self.log_agregado.emit(f"Archivo CSV temporal eliminado: {os.path.basename(self.ruta_csv_temporal)}")
+            except Exception as e:
+                self.log_agregado.emit(f"No se pudo eliminar archivo temporal: {e}")
         
     def run(self):
         """Ejecuta el análisis en un hilo separado"""
@@ -281,6 +321,7 @@ class WorkerThread(QThread):
             
             if not ruta_csv_temporal or self.ventana_progreso.cancelado:
                 if self.ventana_progreso.cancelado:
+                    self._limpiar_archivos_temporales()
                     self.analisis_terminado.emit(False, "Análisis cancelado por el usuario")
                 else:
                     self.analisis_terminado.emit(False, "Error al generar el archivo CSV temporal")
@@ -291,6 +332,7 @@ class WorkerThread(QThread):
             
             if not exito_copia or self.ventana_progreso.cancelado:
                 if self.ventana_progreso.cancelado:
+                    self._limpiar_archivos_temporales()
                     self.analisis_terminado.emit(False, "Análisis cancelado por el usuario")
                 else:
                     self.analisis_terminado.emit(False, "Error al copiar archivos")
@@ -302,8 +344,9 @@ class WorkerThread(QThread):
             # Construir ruta completa de la carpeta de datos
             data_folder = os.path.join(AppConstants.RUTA_BASE_PROYECTO, 'data', nombre_subcarpeta)
             
-            # Guardar la ruta para usar después del análisis
+            # Guardar la ruta para usar después del análisis y para limpieza en caso de cancelación
             self.data_folder_final = data_folder
+            self.carpeta_analisis_creada = data_folder  # Rastrear para limpieza si se cancela
             
             self.fase_analisis.emit("Generando archivo CSV final...", 22)
             self.log_agregado.emit("Generando archivo CSV final en carpeta de análisis...")
@@ -314,6 +357,7 @@ class WorkerThread(QThread):
             
             if not ruta_csv or self.ventana_progreso.cancelado:
                 if self.ventana_progreso.cancelado:
+                    self._limpiar_archivos_temporales()
                     self.analisis_terminado.emit(False, "Análisis cancelado por el usuario")
                 else:
                     self.analisis_terminado.emit(False, "Error al generar el archivo CSV final")
@@ -325,27 +369,26 @@ class WorkerThread(QThread):
             exito_proceso = self.ejecutar_procesofull_py(data_folder)
             
             if self.ventana_progreso.cancelado:
+                self._limpiar_archivos_temporales()
                 self.analisis_terminado.emit(False, "Análisis cancelado por el usuario")
                 return
             
             if exito_proceso:
-                # Limpiar archivo CSV temporal
-                try:
-                    if os.path.exists(ruta_csv_temporal):
-                        os.remove(ruta_csv_temporal)
-                        self.log_agregado.emit("Archivo CSV temporal eliminado")
-                except Exception as e:
-                    self.log_agregado.emit(f"Nota: No se pudo eliminar archivo temporal: {e}")
+                # Limpiar solo el archivo CSV temporal (conservar carpeta de análisis)
+                self._limpiar_solo_csv_temporal()
                 
                 # Mostrar progreso completo al final
                 self.fase_analisis.emit("¡Análisis completado exitosamente!", 100)
                 mensaje_exito = f"Análisis completado exitosamente\n\nCSV generado: {os.path.basename(ruta_csv)}\nEstrellas procesadas: {len(self.datos_filtrados)}\nSubcarpeta: data/{nombre_subcarpeta}"
                 self.analisis_terminado.emit(True, mensaje_exito)
             else:
+                # Limpiar archivo CSV temporal en caso de fallo
+                self._limpiar_archivos_temporales()
                 mensaje_error = f"CSV generado correctamente, pero hubo errores en el procesamiento\n\nCSV: {os.path.basename(ruta_csv)}\nSubcarpeta: data/{nombre_subcarpeta}"
                 self.analisis_terminado.emit(False, mensaje_error)
                 
         except Exception as e:
+            self._limpiar_archivos_temporales()
             self.log_agregado.emit(f"ERROR: {str(e)}")
             self.analisis_terminado.emit(False, f"Error inesperado: {str(e)}")
     
@@ -377,6 +420,9 @@ class WorkerThread(QThread):
             # Guardar en la raíz del proyecto (para copiar.py)
             directorio_actual = os.path.dirname(os.path.abspath(__file__))
             ruta_archivo = os.path.join(directorio_actual, nombre_archivo)
+            
+            # Guardar la ruta del CSV temporal para poder eliminarlo en caso de cancelación
+            self.ruta_csv_temporal = ruta_archivo
             
             return self._generar_csv_base(ruta_archivo)
             
