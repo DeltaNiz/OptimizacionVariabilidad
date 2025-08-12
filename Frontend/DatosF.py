@@ -4,10 +4,11 @@ from PyQt5.QtWidgets import (
     QFrame, QScrollArea, QMessageBox, QFileDialog
 )
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QCursor, QPixmap
+from PyQt5.QtGui import QCursor, QPixmap, QColor
+import os
 import sys
 import pandas as pd
-import os
+import traceback
 
 # Constantes de la aplicación
 class AppConstants:
@@ -26,14 +27,14 @@ class AppConstants:
     SCREEN_MEDIUM = 1920
     
     # Tamaños de ventana
-    WINDOW_MEDIUM = (1350, 800)
+    WINDOW_MEDIUM = (1350, 950)
     WINDOW_LARGE = (1600, 1000)
     
     # Headers de tabla
     TABLE_HEADERS = ["Archivo", "ID", "RA", "DEC", "Magnitud", "Período", "Amplitud", "Tipo", "Significancia"]
     
     # Extensiones de archivos
-    IMAGEN_EXTENSIONES = ['.png', '.jpg', '.jpeg', '.gif', '.bmp']
+    EXTENSIONES_IMAGEN = ['.png', '.jpg', '.jpeg', '.gif', '.bmp']
     CSV_EXTENSIONS = ['.csv']
     
     # Patrones de archivos
@@ -43,7 +44,7 @@ class AppConstants:
     # Mensajes
     MSG_SIN_IMAGENES = ("No se encontraron imágenes en las carpetas de estrellas\n\n"
                        "Las imágenes se generan durante el procesamiento.\n"
-                       "Usa 'Refrescar Datos' si el análisis continúa.")
+                       "Verifica que el análisis haya finalizado correctamente.")
     MSG_SIN_CARPETA = "No se encontró la carpeta de análisis"
     
     # Colores del tema
@@ -51,49 +52,45 @@ class AppConstants:
     COLOR_VERDE_HOVER = "#98b83b"
     COLOR_VERDE_PRESSED = "#7a9530"
     COLOR_VERDE_BORDER = "#98b83b"
-    
-    # Extensiones de archivos
-    EXTENSIONES_IMAGEN = ['.png', '.jpg', '.jpeg', '.gif', '.bmp']
-    EXTENSIONES_CSV = ['.csv']
 
 # Estilos CSS centralizados
 class StyleSheets:
-    HEADER_TABLE = f"""
-        QHeaderView::section {{ 
-            background-color: {AppConstants.COLOR_VERDE_PRINCIPAL}; 
+    HEADER_TABLE = """
+        QHeaderView::section { 
+            background-color: #a7c942; 
             color: white; 
             font-weight: bold;
-            border: 1px solid {AppConstants.COLOR_VERDE_BORDER};
+            border: 1px solid #98b83b;
             padding: 5px;
             text-align: center;
             border-style: solid;
             border-top: none;
             border-left: none;
-            border-right: 1px solid {AppConstants.COLOR_VERDE_BORDER};
-            border-bottom: 1px solid {AppConstants.COLOR_VERDE_BORDER};
-        }}
-        QHeaderView::section:hover {{
-            background-color: {AppConstants.COLOR_VERDE_PRINCIPAL};
-        }}
-        QHeaderView::section:pressed {{
-            background-color: {AppConstants.COLOR_VERDE_PRINCIPAL};
-        }}
+            border-right: 1px solid #98b83b;
+            border-bottom: 1px solid #98b83b;
+        }
+        QHeaderView::section:hover {
+            background-color: #a7c942;
+        }
+        QHeaderView::section:pressed {
+            background-color: #a7c942;
+        }
     """
     
-    TABLE_MAIN = f"""
-        QTableWidget {{
-            gridline-color: {AppConstants.COLOR_VERDE_PRINCIPAL};
+    TABLE_MAIN = """
+        QTableWidget {
+            gridline-color: #a7c942;
             background-color: white;
             alternate-background-color: #f0f0f0;
             margin: 10px;
-        }}
-        QTableWidget::item {{
-            border: 1px solid {AppConstants.COLOR_VERDE_PRINCIPAL};
-        }}
-        QTableWidget::item:selected {{
-            background-color: {AppConstants.COLOR_VERDE_HOVER};
+        }
+        QTableWidget::item {
+            border: 1px solid #a7c942;
+        }
+        QTableWidget::item:selected {
+            background-color: #98b83b;
             color: white;
-        }}
+        }
     """
     
     BUTTON_BASE = """
@@ -111,13 +108,23 @@ class StyleSheets:
         }}
     """
     
-    BUTTON_NAVIGATION = BUTTON_BASE + """
-        QPushButton {{
+    BUTTON_NAVIGATION = """
+        QPushButton {
+            font-size: 11px;
+            color: white;
+            font-weight: bold;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
             background-color: #6c757d;
-        }}
-        QPushButton:hover {{
+        }
+        QPushButton:hover {
             background-color: #5a6268;
-        }}
+        }
+        QPushButton:disabled {
+            background-color: #cccccc;
+            color: #666666;
+        }
     """
     
     BUTTON_ACTION = """
@@ -131,52 +138,52 @@ class StyleSheets:
         }}
     """
     
-    BUTTON_REFRESCAR = BUTTON_ACTION + """
-        QPushButton {{
-            background-color: #f0ad4e;
-        }}
-        QPushButton:hover {{
-            background-color: #ec971f;
-        }}
-        QPushButton:pressed {{
-            background-color: #d58512;
-        }}
+    BUTTON_EXPORTAR = """
+        QPushButton {
+            font-size: 12px;
+            color: white;
+            font-weight: bold;
+            border: none;
+            padding: 5px 20px;
+            border-radius: 8px;
+            background-color: #a7c942;
+        }
+        QPushButton:hover {
+            background-color: #98b83b;
+        }
+        QPushButton:pressed {
+            background-color: #7a9530;
+        }
     """
     
-    BUTTON_EXPORTAR = BUTTON_ACTION + f"""
-        QPushButton {{
-            background-color: {AppConstants.COLOR_VERDE_PRINCIPAL};
-        }}
-        QPushButton:hover {{
-            background-color: {AppConstants.COLOR_VERDE_HOVER};
-        }}
-        QPushButton:pressed {{
-            background-color: {AppConstants.COLOR_VERDE_PRESSED};
-        }}
-    """
-    
-    BUTTON_NUEVO_ANALISIS = BUTTON_ACTION + """
-        QPushButton {{
+    BUTTON_NUEVO_ANALISIS = """
+        QPushButton {
+            font-size: 12px;
+            color: white;
+            font-weight: bold;
+            border: none;
+            padding: 5px 20px;
+            border-radius: 8px;
             background-color: #5bc0de;
-        }}
-        QPushButton:hover {{
+        }
+        QPushButton:hover {
             background-color: #46b8da;
-        }}
-        QPushButton:pressed {{
+        }
+        QPushButton:pressed {
             background-color: #31b0d5;
-        }}
+        }
     """
     
-    IMAGE_LABEL = f"""
-        QLabel {{
-            border: 2px solid {AppConstants.COLOR_VERDE_PRINCIPAL};
+    IMAGE_LABEL = """
+        QLabel {
+            border: 2px solid #a7c942;
             border-radius: 5px;
             background-color: #f9f9f9;
             padding: 10px;
-        }}
+        }
     """
     
-    SEPARATOR = f"QFrame {{ color: {AppConstants.COLOR_VERDE_PRINCIPAL}; background-color: {AppConstants.COLOR_VERDE_PRINCIPAL}; }}"
+    SEPARATOR = "QFrame { color: #a7c942; background-color: #a7c942; }"
 
 class DatosF(QMainWindow):
     def __init__(self, data_folder=None, datos_formulario=None, ventana_anterior=None, ruta_csv_filtrado=None):
@@ -350,8 +357,12 @@ class DatosF(QMainWindow):
         # Controles para navegar entre imágenes
         navegacion_layout = self._create_navigation_controls()
         
+        # Área de logs para mostrar datos de análisis
+        self.logs_area = self._create_logs_area()
+        
         layout.addWidget(self.scroll_area)
         layout.addLayout(navegacion_layout)
+        layout.addWidget(self.logs_area)
 
     def _create_navigation_controls(self):
         """Crea los controles de navegación entre imágenes"""
@@ -371,6 +382,182 @@ class DatosF(QMainWindow):
         
         return navegacion_layout
 
+    def _create_logs_area(self):
+        """Crea el área de logs para mostrar datos de análisis"""
+        logs_frame = QFrame()
+        logs_frame.setFrameStyle(QFrame.StyledPanel)
+        logs_frame.setMaximumHeight(130)
+
+        logs_frame.setStyleSheet("""
+            QFrame {
+                border: 2px solid #a7c942;
+                border-radius: 5px;
+                background-color: #f9f9f9;
+                padding: 2px;
+            }
+        """)
+        
+        logs_layout = QVBoxLayout()
+        # Reducir márgenes para maximizar el espacio utilizable
+        logs_layout.setContentsMargins(5, 5, 5, 5)
+        logs_layout.setSpacing(2)
+        
+        # Área de texto para mostrar los logs
+        self.logs_text = QLabel()
+        self.logs_text.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.logs_text.setStyleSheet("""
+            QLabel {
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+                color: #444;
+                background-color: #fff;
+                padding: 6px;
+                border: none;
+                selection-background-color: #3390ff;
+            }
+        """)
+        self.logs_text.setText("Selecciona una estrella para ver sus datos de análisis...")
+        self.logs_text.setWordWrap(True)
+        self.logs_text.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        
+        # Scroll area para el contenido de logs
+        logs_scroll = QScrollArea()
+        logs_scroll.setWidgetResizable(True)
+        logs_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        logs_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        logs_scroll.setWidget(self.logs_text)
+        # Eliminar borde del scroll area para evitar bordes múltiples
+        logs_scroll.setFrameStyle(QFrame.NoFrame)
+        logs_scroll.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background-color: transparent;
+            }
+        """)
+        # Remover limitación de altura máxima para que use todo el espacio disponible
+        
+        logs_layout.addWidget(logs_scroll)
+        
+        logs_frame.setLayout(logs_layout)
+        return logs_frame
+
+    def cargar_datos_reporte_analisis(self):
+        """Carga los datos del reporte Best_Peak_GLS_Min_PDM.csv"""
+        self.datos_reporte = {}
+        
+        if not self.data_folder:
+            return
+        
+        # Buscar el archivo de reporte en la carpeta de análisis
+        ruta_reporte = os.path.join(self.data_folder, 'Best_Peak_GLS_Min_PDM.csv')
+        
+        if os.path.exists(ruta_reporte):
+            try:
+                import pandas as pd
+                df_reporte = pd.read_csv(ruta_reporte)
+                
+                print(f"Cargando reporte desde: {ruta_reporte}")
+                print(f"Columnas encontradas: {list(df_reporte.columns)}")
+                print(f"Número de filas: {len(df_reporte)}")
+                
+                # Convertir a diccionario indexado por número de estrella
+                for _, row in df_reporte.iterrows():
+                    if 'star' in row:
+                        star_name = str(row['star'])  # "star1", "star2", etc.
+                        
+                        # Extraer solo el número de la estrella
+                        if star_name.startswith('star'):
+                            star_number = star_name.replace('star', '')
+                        else:
+                            star_number = star_name
+                        
+                        self.datos_reporte[star_number] = {
+                            'status': row.get('status', 'N/A'),
+                            'time': row.get('time', 0),
+                            'Best Peak GLS V': row.get('Best Peak GLS V', 'N/A'),
+                            'Best Peak GLS I': row.get('Best Peak GLS I', 'N/A'),
+                            'Best Minima PDM V': row.get('Best Minima PDM V', 'N/A'),
+                            'Best Minima PDM I': row.get('Best Minima PDM I', 'N/A')
+                        }
+                
+                print(f"Datos de reporte cargados: {len(self.datos_reporte)} estrellas")
+                print(f"Claves en datos_reporte: {list(self.datos_reporte.keys())}")
+                
+            except Exception as e:
+                print(f"Error al cargar reporte de análisis: {e}")
+                import traceback
+                traceback.print_exc()
+                self.datos_reporte = {}
+        else:
+            print(f"No se encontró el archivo de reporte en: {ruta_reporte}")
+            print(f"Contenido de la carpeta: {os.listdir(self.data_folder) if os.path.exists(self.data_folder) else 'Carpeta no existe'}")
+
+    def mostrar_datos_estrella_actual(self):
+        """Muestra los datos de análisis de la estrella actual en el área de logs"""
+        if not hasattr(self, 'logs_text'):
+            print("logs_text no existe todavía")
+            return
+            
+        numero_estrella = self.obtener_numero_estrella_actual()
+
+        if not numero_estrella:
+            self.logs_text.setText("No se pudo determinar el número de estrella actual.")
+            return
+            
+        if not hasattr(self, 'datos_reporte') or not self.datos_reporte:
+            self.logs_text.setText("No se han cargado los datos del reporte de análisis.")
+            return
+            
+        if numero_estrella not in self.datos_reporte:
+            self.logs_text.setText(f"No hay datos de análisis disponibles para la estrella {numero_estrella}.\nDatos disponibles para: {', '.join(self.datos_reporte.keys())}")
+            return
+        
+        datos = self.datos_reporte[numero_estrella]
+        
+        # Formatear los datos para mostrar
+        texto_logs = f"<b>ESTRELLA {numero_estrella}</b><br><br>"
+        
+        # Estado del procesamiento
+        status = datos.get('status', 'N/A')
+        tiempo = datos.get('time', 0)
+        
+        if status == 'success':
+            texto_logs += f"<span style='color: green;'>Procesamiento exitoso</span><br>"
+        elif status == 'error':
+            texto_logs += f"<span style='color: red;'>Error en procesamiento</span><br>"
+        else:
+            texto_logs += f"<span style='color: orange;'>Estado: {status}</span><br>"
+        
+        texto_logs += f"<span style='color: #666;'>Tiempo de procesamiento: {tiempo:.2f}s</span><br><br>"
+        
+        # Datos de análisis
+        if status == 'success':
+            texto_logs += "<b>PERÍODOS DETECTADOS:</b><br><br>"
+            
+            # GLS (Generalized Lomb-Scargle)
+            gls_v = datos.get('Best Peak GLS V', 'N/A')
+            gls_i = datos.get('Best Peak GLS I', 'N/A')
+            
+            texto_logs += "<u>Análisis GLS:</u><br>"
+            texto_logs += f"• Filtro V: <b>{gls_v}</b> días<br>"
+            texto_logs += f"• Filtro I: <b>{gls_i}</b> días<br><br>"
+            
+            # PDM (Phase Dispersion Minimization)
+            pdm_v = datos.get('Best Minima PDM V', 'N/A')
+            pdm_i = datos.get('Best Minima PDM I', 'N/A')
+            
+            texto_logs += "<u>Análisis PDM:</u><br>"
+            texto_logs += f"• Filtro V: <b>{pdm_v}</b> días<br>"
+            texto_logs += f"• Filtro I: <b>{pdm_i}</b> días<br><br>"
+            
+        else:
+            # Mostrar información de error si está disponible
+            mensaje = datos.get('message', 'No hay información adicional disponible')
+            texto_logs += f"<b>DETALLES DEL ERROR:</b><br>"
+            texto_logs += f"<span style='color: red;'>{mensaje}</span><br>"
+        
+        self.logs_text.setText(texto_logs)
+
     def _create_navigation_button(self, text, callback):
         """Crea un botón de navegación con estilo consistente"""
         button = QPushButton(text)
@@ -383,12 +570,6 @@ class DatosF(QMainWindow):
 
     def _setup_action_buttons(self, layout):
         """Configura los botones de acción principales"""
-        btn_refrescar = self._create_action_button(
-            "Refrescar Datos", 
-            StyleSheets.BUTTON_REFRESCAR, 
-            self.refrescar_datos
-        )
-        
         btn_exportar = self._create_action_button(
             "Exportar Resultados", 
             StyleSheets.BUTTON_EXPORTAR, 
@@ -404,8 +585,6 @@ class DatosF(QMainWindow):
         # Layout para botones
         buttons_layout = QHBoxLayout()
         buttons_layout.addStretch()
-        buttons_layout.addWidget(btn_refrescar)
-        buttons_layout.addSpacing(10)
         buttons_layout.addWidget(btn_exportar)
         buttons_layout.addSpacing(10)
         buttons_layout.addWidget(btn_nuevo_analisis)
@@ -631,240 +810,6 @@ class DatosF(QMainWindow):
             print(f"Error al cargar CSV: {e}")
             # self.mostrar_datos_ejemplo()
 
-    # def mostrar_datos_ejemplo(self):
-    #     """Muestra datos de ejemplo si no se pueden cargar los resultados"""
-    #     # Configurar tabla con datos de ejemplo
-    #     self.table_main.setRowCount(5)
-    #     self.table_main.setColumnCount(5)
-    #     self.table_main.setHorizontalHeaderLabels(["N°", "V", "I", "MV", "MI"])
-    #     
-    #     datos_ejemplo = [
-    #         ["1","0552.491_0637.323V","0551.708_0637.363i", "15.0034280824373", "13.9925005227811"],
-    #         ["2","0455.988_0351.249V","0455.231_0350.973i", "15.000864265233", "13.8664936400888"]
-    #     ]
-    #     
-    #     for row, fila_datos in enumerate(datos_ejemplo):
-    #         for col, valor in enumerate(fila_datos):
-    #             item = QTableWidgetItem(valor)
-    #             item.setTextAlignment(Qt.AlignCenter)
-    #             self.table_main.setItem(row, col, item)
-    #     
-    #     # Ajustar ancho de columnas
-    #     self.table_main.setColumnWidth(0, self.ancho_celda_1)   # N° - 48px
-    #     self.table_main.setColumnWidth(1, self.ancho_celda) # Columnas restantes - 130px
-    #     self.table_main.setColumnWidth(2, self.ancho_celda)
-    #     self.table_main.setColumnWidth(3, self.ancho_celda)
-    #     self.table_main.setColumnWidth(4, self.ancho_celda)
-    #     
-    #     # Limpiar selección cuando se muestran datos de ejemplo
-    #     self.table_main.clearSelection()
-    #     
-    #     # Crear imágenes de ejemplo simuladas para las dos estrellas
-    #     self.crear_imagenes_ejemplo()
-    #     
-    #     # Mostrar imagen de ejemplo después de que la UI esté completamente inicializada
-    #     from PyQt5.QtCore import QTimer
-    #     QTimer.singleShot(100, self.mostrar_imagen_ejemplo)
-
-    # def crear_imagenes_ejemplo(self):
-    #     """Crea un conjunto de imágenes de ejemplo para simular la navegación"""
-    #     # Lista de rutas de imágenes de ejemplo
-    #     rutas_ejemplo = [
-    #         r"C:\Users\tomas\OneDrive\Escritorio\xd\U\2025-1\Formulacion de Proyecto de Titulacion\data\analisis_20250729_170749\star1\GLSPDM.png",
-    #         r"C:\Users\tomas\OneDrive\Escritorio\xd\U\2025-1\Formulacion de Proyecto de Titulacion\data\analisis_20250729_170749\star2\GLSPDM.png"
-    #     ]
-    #     
-    #     # Limpiar la lista de imágenes existente
-    #     self.imagenes_estrellas = []
-    #     
-    #     # Agregar imágenes de ejemplo si existen
-    #     for i, ruta in enumerate(rutas_ejemplo, 1):
-    #         if os.path.exists(ruta):
-    #             self.imagenes_estrellas.append({
-    #                 'ruta': ruta,
-    #                 'estrella': str(i),
-    #                 'nombre': f'GLSPDM_ejemplo_estrella_{i}.png',
-    #                 'carpeta': f'star{i}_ejemplo'
-    #             })
-    #             print(f"Imagen de ejemplo agregada: Estrella {i}")
-    #         else:
-    #             # Si no existe la imagen real, crear una entrada para imagen generada
-    #             self.imagenes_estrellas.append({
-    #                 'ruta': 'generada',  # Marcador para imagen generada
-    #                 'estrella': str(i),
-    #                 'nombre': f'ejemplo_generado_estrella_{i}.png',
-    #                 'carpeta': f'star{i}_ejemplo'
-    #             })
-    #             print(f"Imagen generada programáticamente para: Estrella {i}")
-    #     
-    #     # Configurar el índice inicial
-    #     self.imagen_actual_index = 0
-    #     
-    #     # Actualizar controles de navegación para habilitar los botones
-    #     # Usar QTimer para llamarlo después de que la UI esté completamente inicializada
-    #     from PyQt5.QtCore import QTimer
-    #     QTimer.singleShot(200, self.actualizar_controles_navegacion)
-
-    # def mostrar_imagen_ejemplo(self):
-    #     """Muestra una imagen de ejemplo cuando no hay datos reales disponibles"""
-    #     # Verificar si image_label existe (puede no existir durante la inicialización)
-    #     if not hasattr(self, 'image_label') or self.image_label is None:
-    #         print("image_label no disponible, imagen de ejemplo será mostrada después")
-    #         return
-    #     
-    #     # Verificar si hay imágenes de ejemplo disponibles
-    #     if not hasattr(self, 'imagenes_estrellas') or not self.imagenes_estrellas:
-    #         self.mostrar_imagen_ejemplo_fallback()
-    #         return
-    #     
-    #     # Obtener la imagen actual del índice
-    #     if self.imagen_actual_index >= len(self.imagenes_estrellas):
-    #         self.imagen_actual_index = 0
-    #     
-    #     imagen_info = self.imagenes_estrellas[self.imagen_actual_index]
-    #     
-    #     try:
-    #         if imagen_info['ruta'] != 'generada' and os.path.exists(imagen_info['ruta']):
-    #             # Cargar imagen real si existe
-    #             from PyQt5.QtGui import QPixmap
-    #             from PyQt5.QtCore import Qt
-    #             
-    #             pixmap = QPixmap(imagen_info['ruta'])
-    #             if not pixmap.isNull():
-    #                 # Escalar imagen para que quepa bien en el área
-    #                 scaled_pixmap = pixmap.scaled(
-    #                     self.imagen_ancho_fijo,  # Usar configuración centralizada
-    #                     self.imagen_alto_maximo,  # Usar configuración centralizada
-    #                     Qt.KeepAspectRatio, 
-    #                     Qt.SmoothTransformation
-    #                 )
-    #                 self.image_label.setPixmap(scaled_pixmap)
-    #                 self.image_label.setText("")
-    #                 print(f"Imagen de ejemplo cargada desde: {imagen_info['ruta']}")
-    #             else:
-    #                 # Si no se puede cargar, crear imagen programática
-    #                 self.crear_imagen_ejemplo_programatica(imagen_info['estrella'])
-    #         else:
-    #             # Crear imagen programática para esta estrella
-    #             self.crear_imagen_ejemplo_programatica(imagen_info['estrella'])
-    #             
-    #     except Exception as e:
-    #         print(f"Error al cargar imagen de ejemplo: {e}")
-    #         # Fallback a imagen programática
-    #         self.crear_imagen_ejemplo_programatica(imagen_info['estrella'])
-    #     
-    #     # Actualizar título y selección de fila
-    #     self.actualizar_titulo()
-    #     self.seleccionar_fila_estrella_actual()
-
-    # def mostrar_imagen_ejemplo_fallback(self):
-    #     """Muestra imagen de ejemplo cuando no hay sistema de navegación configurado"""
-    #     try:
-    #         # Ruta de la imagen de ejemplo principal
-    #         ruta_imagen_ejemplo = r"C:\Users\tomas\OneDrive\Escritorio\xd\U\2025-1\Formulacion de Proyecto de Titulacion\data\analisis_20250729_170749\star1\GLSPDM.png"
-    #         
-    #         # Verificar si la imagen de ejemplo existe
-    #         if os.path.exists(ruta_imagen_ejemplo):
-    #             # Cargar la imagen de ejemplo
-    #             from PyQt5.QtGui import QPixmap
-    #             from PyQt5.QtCore import Qt
-    #             
-    #             pixmap = QPixmap(ruta_imagen_ejemplo)
-    #             if not pixmap.isNull():
-    #                 # Escalar imagen para que quepa bien en el área
-    #                 scaled_pixmap = pixmap.scaled(
-    #                     self.imagen_ancho_fijo,  # Usar configuración centralizada
-    #                     self.imagen_alto_maximo,  # Usar configuración centralizada
-    #                     Qt.KeepAspectRatio, 
-    #                     Qt.SmoothTransformation
-    #                 )
-    #                 self.image_label.setPixmap(scaled_pixmap)
-    #                 self.image_label.setText("")
-    #                 print(f"Imagen de ejemplo fallback cargada desde: {ruta_imagen_ejemplo}")
-    #             else:
-    #                 raise Exception("No se pudo cargar la imagen de ejemplo")
-    #         else:
-    #             raise Exception(f"Imagen de ejemplo no encontrada en: {ruta_imagen_ejemplo}")
-    #         
-    #     except Exception as e:
-    #         print(f"Error al cargar imagen de ejemplo fallback: {e}")
-    #         # Crear imagen programática como último recurso
-    #         self.crear_imagen_ejemplo_programatica("1")
-
-    # def crear_imagen_ejemplo_programatica(self, numero_estrella):
-    #     """Crea una imagen de ejemplo programáticamente para una estrella específica"""
-    #     try:
-    #         # Crear una imagen de ejemplo usando texto
-    #         from PyQt5.QtGui import QPixmap, QPainter, QFont, QFontMetrics
-    #         from PyQt5.QtCore import Qt
-    #         
-    #         # Crear un pixmap para la imagen de ejemplo
-    #         width, height = 400, 300
-    #         pixmap = QPixmap(width, height)
-    #         pixmap.fill(QColor(240, 240, 240))  # Fondo gris claro
-    #         
-    #         painter = QPainter(pixmap)
-    #         painter.setRenderHint(QPainter.Antialiasing)
-    #         
-    #         # Configurar fuente
-    #         font = QFont("Arial", 12, QFont.Bold)
-    #         painter.setFont(font)
-    #         painter.setPen(QColor(70, 70, 70))
-    #         
-    #         # Texto de ejemplo específico para la estrella
-    #         texto_ejemplo = [
-    #             f"EJEMPLO DE ANÁLISIS",
-    #             "",
-    #             f"Estrella Variable #{numero_estrella}",
-    #             "",
-    #             f"• Período: {2.45 + float(numero_estrella) * 0.3:.2f} días",
-    #             f"• Amplitud: {0.3 + float(numero_estrella) * 0.1:.2f} mag",
-    #             "• Tipo: RR Lyrae",
-    #             "",
-    #             "Este es un ejemplo de los",
-    #             "resultados que se mostrarán",
-    #             "una vez completado el análisis"
-    #         ]
-    #         
-    #         # Calcular posición inicial
-    #         font_metrics = QFontMetrics(font)
-    #         line_height = font_metrics.height()
-    #         y_start = (height - len(texto_ejemplo) * line_height) // 2
-    #         
-    #         # Dibujar texto línea por línea
-    #         for i, linea in enumerate(texto_ejemplo):
-    #             if linea:  # Solo dibujar si la línea no está vacía
-    #                 text_width = font_metrics.width(linea)
-    #                 x = (width - text_width) // 2  # Centrar texto
-    #                 y = y_start + i * line_height
-    #                 painter.drawText(x, y, linea)
-    #         
-    #         # Dibujar un marco decorativo
-    #         painter.setPen(QColor(167, 201, 66))  # Color verde del tema
-    #         painter.drawRect(10, 10, width-20, height-20)
-    #         
-    #         painter.end()
-    #         
-    #         # Mostrar la imagen
-    #         self.image_label.setPixmap(pixmap)
-    #         self.image_label.setText("")
-    #         print(f"Imagen de ejemplo generada programáticamente para Estrella {numero_estrella}")
-    #         
-    #     except Exception as e2:
-    #         # Si hay error creando la imagen, mostrar texto de ejemplo
-    #         texto_ejemplo = (f"DATOS DE EJEMPLO - ESTRELLA {numero_estrella}\n\n"
-    #                        "Esta es una vista previa de cómo\n"
-    #                        "se mostrarán los resultados una vez\n"
-    #                        "que se complete el análisis.\n\n"
-    #                        "• Tabla con datos filtrados\n"
-    #                        "• Gráficos de curvas de luz\n"
-    #                        "• Imágenes de cada estrella\n\n"
-    #                        "Usa 'Nuevo Análisis' para\n"
-    #                        "procesar datos reales")
-    #         
-    #         self.image_label.setText(texto_ejemplo)
-    #         print(f"Error al crear imagen de respaldo, mostrando texto para Estrella {numero_estrella}: {e2}")
-
     def _buscar_archivos_por_patron(self, directorio, patrones, extensiones=None):
         """
         Busca archivos que coincidan con patrones específicos de manera optimizada
@@ -980,18 +925,6 @@ class DatosF(QMainWindow):
             info_texto += f"\nError al listar archivos: {e}"
         
         self.image_label.setText(info_texto)
-
-    def refrescar_datos(self):
-        """Refresca los datos y las imágenes"""
-        print("Refrescando datos...")
-        self.cargar_datos_csv_filtrado()
-        self.cargar_imagenes_estrellas()
-        
-        QMessageBox.information(
-            self,
-            "Datos Refrescados",
-            "Los datos han sido actualizados con cualquier nuevo resultado disponible."
-        )
 
     def exportar_resultados(self):
         """Exporta los resultados a un archivo de manera optimizada"""
@@ -1146,55 +1079,47 @@ class DatosF(QMainWindow):
         if not self._validar_carpeta_analisis():
             return
         
+        # Cargar datos del reporte de análisis
+        self.cargar_datos_reporte_analisis()
+        
         # Buscar imágenes de manera eficiente
         try:
             self.imagenes_estrellas = self._buscar_imagenes_en_carpetas_estrellas()
-            
-            if self.imagenes_estrellas:
-                self._configurar_visualizacion_imagenes()
-            else:
-                self._mostrar_mensaje_sin_imagenes()
-                
+            self._configurar_visualizacion_imagenes()
         except Exception as e:
-            self._manejar_error_carga_imagenes(e)
+            print(f"Error al cargar imágenes de estrellas: {e}")
+            self._mostrar_mensaje_sin_imagenes()
 
     def _validar_carpeta_analisis(self):
         """Valida que la carpeta de análisis exista"""
         if not self.data_folder or not os.path.exists(self.data_folder):
-            self.image_label.setText("No se encontró la carpeta de análisis")
-            self.actualizar_controles_navegacion()
-            self.table_main.clearSelection()
+            self._mostrar_mensaje_sin_imagenes()
             return False
         return True
 
     def _buscar_imagenes_en_carpetas_estrellas(self):
         """Busca imágenes en carpetas de estrellas de manera optimizada"""
         imagenes = []
-        
-        # Usar os.scandir para mejor rendimiento
-        with os.scandir(self.data_folder) as entries:
-            carpetas_estrella = [
-                entry for entry in entries 
-                if entry.is_dir() and entry.name.startswith('star')
-            ]
-        
-        # Procesar cada carpeta de estrella
-        for carpeta_entry in carpetas_estrella:
-            imagenes_carpeta = self._buscar_imagenes_en_carpeta(carpeta_entry)
-            imagenes.extend(imagenes_carpeta)
-        
-        # Ordenar por número de estrella
-        return sorted(imagenes, key=lambda x: int(x['estrella']) if x['estrella'].isdigit() else 0)
+        try:
+            with os.scandir(self.data_folder) as entries:
+                for entry in entries:
+                    if entry.is_dir() and entry.name.startswith('star'):
+                        imagenes_carpeta = self._buscar_imagenes_en_carpeta(entry)
+                        imagenes.extend(imagenes_carpeta)
+        except Exception as e:
+            print(f"Error al buscar imágenes en carpetas: {e}")
+        return imagenes
 
     def _buscar_imagenes_en_carpeta(self, carpeta_entry):
         """Busca imágenes en una carpeta específica de estrella"""
         imagenes = []
-        numero_estrella = carpeta_entry.name.replace('star', '')
-        
         try:
             with os.scandir(carpeta_entry.path) as archivos:
                 for archivo in archivos:
                     if archivo.is_file() and self._es_archivo_imagen(archivo.name):
+                        # Extraer número de estrella del nombre de la carpeta
+                        numero_estrella = carpeta_entry.name.replace('star', '')
+                        
                         imagenes.append({
                             'ruta': archivo.path,
                             'estrella': numero_estrella,
@@ -1203,99 +1128,80 @@ class DatosF(QMainWindow):
                         })
         except Exception as e:
             print(f"Error al buscar imágenes en {carpeta_entry.name}: {e}")
-            
         return imagenes
 
     def _es_archivo_imagen(self, nombre_archivo):
-        """Verifica si un archivo es una imagen usando extensiones predefinidas"""
-        return any(nombre_archivo.lower().endswith(ext) for ext in AppConstants.IMAGEN_EXTENSIONES)
+        """Verifica si un archivo es una imagen válida"""
+        return any(nombre_archivo.lower().endswith(ext) for ext in AppConstants.EXTENSIONES_IMAGEN)
 
     def _configurar_visualizacion_imagenes(self):
-        """Configura la visualización cuando hay imágenes disponibles"""
-        print(f"Encontradas {len(self.imagenes_estrellas)} imágenes de estrellas")
-        self.imagen_actual_index = 0
-        self.mostrar_imagen_actual()
-        self.actualizar_controles_navegacion()
+        """Configura la visualización inicial de imágenes"""
+        if self.imagenes_estrellas:
+            # Ordenar imágenes por número de estrella
+            self.imagenes_estrellas.sort(key=lambda x: int(x['estrella']))
+            print(f"Encontradas {len(self.imagenes_estrellas)} imágenes de estrellas")
+            self.imagen_actual_index = 0
+            self.mostrar_imagen_actual()
+            self.actualizar_controles_navegacion()
+        else:
+            print("No se encontraron imágenes")
+            self._mostrar_mensaje_sin_imagenes()
 
     def _mostrar_mensaje_sin_imagenes(self):
         """Muestra mensaje cuando no hay imágenes disponibles"""
         mensaje = ("No se encontraron imágenes en las carpetas de estrellas\n\n"
                   "Las imágenes se generan durante el procesamiento.\n"
-                  "Usa 'Refrescar Datos' si el análisis continúa.")
+                  "Verifica que el análisis haya finalizado correctamente.")
         self.image_label.setText(mensaje)
         print("No se encontraron imágenes en las carpetas de estrellas")
         self.actualizar_titulo()
         self.table_main.clearSelection()
         self.actualizar_controles_navegacion()
-
-    def _manejar_error_carga_imagenes(self, error):
-        """Maneja errores durante la carga de imágenes"""
-        mensaje_error = f"Error al buscar imágenes: {str(error)}"
-        self.image_label.setText(mensaje_error)
-        print(f"Error al cargar imágenes de estrellas: {error}")
-        self.actualizar_controles_navegacion()
-        self.actualizar_titulo()
-        self.table_main.clearSelection()
+        
+        # Mostrar mensaje por defecto en los logs cuando no hay imágenes
+        if hasattr(self, 'logs_text'):
+            self.logs_text.setText("No se encontraron imágenes de análisis.\n\nLos datos de análisis se mostrarán aquí cuando las imágenes estén disponibles.")
 
     def mostrar_imagen_actual(self):
-        """Muestra la imagen actual según el índice"""
+        """Muestra la imagen actual basada en el índice"""
         if not self.imagenes_estrellas or self.imagen_actual_index >= len(self.imagenes_estrellas):
+            self._mostrar_mensaje_sin_imagenes()
             return
         
         imagen_info = self.imagenes_estrellas[self.imagen_actual_index]
         
         try:
-            pixmap = QPixmap(imagen_info['ruta'])
-            if not pixmap.isNull():
-                # Escalar imagen para que quepa bien en el área
-                scaled_pixmap = pixmap.scaled(
-                    self.imagen_ancho_fijo,  # Usar configuración centralizada
-                    self.imagen_alto_maximo,  # Usar configuración centralizada
-                    Qt.KeepAspectRatio, 
-                    Qt.SmoothTransformation
-                )
-                self.image_label.setPixmap(scaled_pixmap)
-                self.image_label.setText("")
+            if self._cargar_imagen_optimizada(imagen_info['ruta']):
+                self.actualizar_titulo()
+                self.seleccionar_fila_estrella_actual()
+                self.mostrar_datos_estrella_actual()
+                # Actualizar controles de navegación después de mostrar la imagen
+                self.actualizar_controles_navegacion()
             else:
-                self.image_label.setText(f"Error al cargar imagen de estrella {imagen_info['estrella']}")
+                self._mostrar_mensaje_sin_imagenes()
         except Exception as e:
-            self.image_label.setText(f"Error al mostrar imagen: {str(e)}")
-            print(f"Error al mostrar imagen: {e}")
-        
-        self.actualizar_controles_navegacion()
-        
-        # Actualizar título con el número de estrella actual
-        self.actualizar_titulo()
-        
-        # Seleccionar la fila correspondiente en la tabla
-        self.seleccionar_fila_estrella_actual()
+            print(f"Error al mostrar imagen actual: {e}")
+            self._mostrar_mensaje_sin_imagenes()
 
     def seleccionar_fila_estrella_actual(self):
-        """Selecciona la fila en la tabla que corresponde a la estrella actual"""
+        """Selecciona la fila correspondiente a la estrella actual en la tabla"""
         if not self.imagenes_estrellas or self.imagen_actual_index >= len(self.imagenes_estrellas):
             return
         
-        imagen_info = self.imagenes_estrellas[self.imagen_actual_index]
-        numero_estrella = imagen_info['estrella']
-        
-        # Buscar la fila que corresponde a esta estrella
-        for row in range(self.table_main.rowCount()):
-            # Verificar la primera columna (N°) para encontrar la estrella correspondiente
-            item = self.table_main.item(row, 0)
-            if item and item.text() == numero_estrella:
-                # Limpiar selección anterior
-                self.table_main.clearSelection()
-                
-                # Seleccionar toda la fila
-                self.table_main.selectRow(row)
-                
-                # Hacer scroll para que la fila sea visible
-                self.table_main.scrollToItem(item)
-                
-                break
+        try:
+            numero_estrella = self.imagenes_estrellas[self.imagen_actual_index]['estrella']
+            
+            # Buscar la fila que corresponde a esta estrella
+            for row in range(self.table_main.rowCount()):
+                item_primera_columna = self.table_main.item(row, 0)
+                if item_primera_columna and item_primera_columna.text() == numero_estrella:
+                    self.table_main.selectRow(row)
+                    break
+        except Exception as e:
+            print(f"Error al seleccionar fila de estrella: {e}")
 
     def actualizar_controles_navegacion(self):
-        """Actualiza los controles de navegación entre imágenes"""
+        """Actualiza el estado de los controles de navegación"""
         # Verificar que los controles de navegación existan antes de actualizarlos
         if not hasattr(self, 'btn_anterior') or not hasattr(self, 'btn_siguiente') or not hasattr(self, 'label_imagen_info'):
             print("Controles de navegación no disponibles aún durante la inicialización")
@@ -1337,7 +1243,7 @@ class DatosF(QMainWindow):
                 # Modo ejemplo
                 # self.mostrar_imagen_ejemplo()
                 pass
-
+            
     def nuevo_analisis(self):
         """Vuelve a la ventana anterior para realizar un nuevo análisis"""
         if self.ventana_anterior:
