@@ -231,6 +231,11 @@ class DatosNF(QMainWindow):
         self.ventana_subir = ventana_subir
         self.ventana_main = ventana_main
         self.filas_descartadas = []  # Lista para mantener track de las filas descartadas
+        
+        # Variables para configuración de período (sin valores por defecto)
+        self.periodo_max = None
+        self.periodo_min = None
+        
         self.init_ui()
     
     def init_ui(self):
@@ -353,6 +358,14 @@ class DatosNF(QMainWindow):
         right_layout.addWidget(self._create_horizontal_separator())
         right_layout.addSpacing(10)
         
+        # Controles de período
+        self._setup_periodo_controls(right_layout)
+        
+        # Separador
+        right_layout.addSpacing(10)
+        right_layout.addWidget(self._create_horizontal_separator())
+        right_layout.addSpacing(10)
+        
         # Botones de acción
         self._setup_action_buttons(right_layout)
         right_layout.addSpacing(10)
@@ -364,11 +377,6 @@ class DatosNF(QMainWindow):
         label_title = QLabel("<b>Datos Cargados Correctamente</b>")
         label_title.setAlignment(Qt.AlignCenter)
         label_title.setStyleSheet(AppConstants.FUENTE_TITULO)
-        
-        # Mostrar información del formulario si está disponible
-        if self.datos_formulario:
-            info_formulario = self.crear_info_formulario()
-            label_title.setText(f"<b>Datos Cargados Correctamente</b><br><small>{info_formulario}</small>")
         
         label_subtitle = QLabel("Seleccione una estrella de la lista para descartarla")
         label_subtitle.setAlignment(Qt.AlignCenter)
@@ -446,6 +454,65 @@ class DatosNF(QMainWindow):
         range_layout.addWidget(btn_aplicar_rangos)
         
         layout.addLayout(range_layout)
+
+    def _setup_periodo_controls(self, layout):
+        """Configura los controles para período mínimo y máximo"""
+        # Título de la sección (igual que rangos)
+        titulo = QLabel("<b>Configuración de Período:</b>")
+        layout.addWidget(titulo)
+        
+        # Layout para período máximo
+        max_layout = QHBoxLayout()
+        max_label = QLabel("Período Máx:")
+        max_label.setFixedWidth(85)
+        max_label.setStyleSheet("font-weight: bold; color: #34495e; font-size: 11px;")
+        
+        self.input_periodo_max = QLineEdit()
+        self.input_periodo_max.setPlaceholderText("Ej: 3")
+        self.input_periodo_max.setFixedWidth(70)
+        self.input_periodo_max.setStyleSheet("border: 1px solid #a7c942; border-radius: 3px; padding: 2px;")  # Borde verde para indicar requerido
+
+        dias_label1 = QLabel("días")
+        dias_label1.setStyleSheet("color: #7f8c8d; font-size: 10px;")
+        
+        max_layout.addWidget(max_label)
+        max_layout.addWidget(self.input_periodo_max)
+        max_layout.addWidget(dias_label1)
+        max_layout.addStretch()
+        
+        # Layout para período mínimo
+        min_layout = QHBoxLayout()
+        min_label = QLabel("Período Min:")
+        min_label.setFixedWidth(85)
+        min_label.setStyleSheet("font-weight: bold; color: #34495e; font-size: 11px;")
+        
+        self.input_periodo_min = QLineEdit()
+        self.input_periodo_min.setPlaceholderText("Ej: 0.01")
+        self.input_periodo_min.setFixedWidth(70)
+        self.input_periodo_min.setStyleSheet("border: 1px solid #a7c942; border-radius: 3px; padding: 2px;")  # Borde verde para indicar requerido
+
+        dias_label2 = QLabel("días")
+        dias_label2.setStyleSheet("color: #7f8c8d; font-size: 10px;")
+        
+        min_layout.addWidget(min_label)
+        min_layout.addWidget(self.input_periodo_min)
+        min_layout.addWidget(dias_label2)
+        min_layout.addStretch()
+        
+        # Crear contenedor centrado para ambos layouts
+        contenedor_centrado = QHBoxLayout()
+        contenedor_centrado.addStretch()  # Espacio izquierdo
+        
+        # Contenedor vertical para los inputs
+        inputs_verticales = QVBoxLayout()
+        inputs_verticales.addLayout(max_layout)
+        inputs_verticales.addLayout(min_layout)
+        
+        contenedor_centrado.addLayout(inputs_verticales)
+        contenedor_centrado.addStretch()  # Espacio derecho
+        
+        # Agregar el contenedor centrado al layout principal
+        layout.addLayout(contenedor_centrado)
 
     def _setup_action_buttons(self, layout):
         """Configura los botones de acción principales"""
@@ -601,6 +668,50 @@ class DatosNF(QMainWindow):
         except Exception as e:
             print(f"Error al procesar rangos: {e}")
 
+    def _validar_y_aplicar_periodo(self):
+        """Valida y aplica los valores de período silenciosamente. Retorna True si es exitoso."""
+        try:
+            # Obtener valores de los inputs
+            periodo_max_text = self.input_periodo_max.text().strip() if hasattr(self, 'input_periodo_max') else ""
+            periodo_min_text = self.input_periodo_min.text().strip() if hasattr(self, 'input_periodo_min') else ""
+            
+            # Verificar que ambos campos tengan valores
+            if not periodo_max_text or not periodo_min_text:
+                QMessageBox.warning(self, "Valores Faltantes", 
+                    "Debe ingresar valores para el período máximo y mínimo antes de realizar el análisis.")
+                return False
+            
+            # Convertir a float
+            periodo_max = float(periodo_max_text)
+            periodo_min = float(periodo_min_text)
+            
+            # Validar que período mínimo sea menor que máximo
+            if periodo_min >= periodo_max:
+                QMessageBox.warning(self, "Error de Validación", 
+                    "El período mínimo debe ser menor que el período máximo.")
+                return False
+            
+            # Validar que los valores sean positivos
+            if periodo_min <= 0 or periodo_max <= 0:
+                QMessageBox.warning(self, "Error de Validación", 
+                    "Los valores de período deben ser positivos.")
+                return False
+            
+            # Guardar los nuevos valores
+            self.periodo_min = periodo_min
+            self.periodo_max = periodo_max
+            
+            print(f"Período aplicado: Máx={periodo_max}, Mín={periodo_min} días")
+            return True
+            
+        except ValueError:
+            QMessageBox.warning(self, "Error de Formato", 
+                "Los valores de período deben ser números válidos.")
+            return False
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error al aplicar período: {str(e)}")
+            return False
+
     def aplicar_checkboxes_rangos(self, numeros):
         """Activa los checkboxes de las filas en los rangos especificados y las agrega a descartadas"""
         for numero in numeros:
@@ -726,8 +837,22 @@ class DatosNF(QMainWindow):
         try:
             print("=== INICIANDO ANÁLISIS DESDE DATOSNF ===")
             
-            # Usar la función de Analisis.py
-            exito, mensaje = realizar_analisis_completo(self.table_main, self.table_descartadas, self.datos_formulario)
+            # Aplicar automáticamente los valores de período antes del análisis
+            print("Aplicando valores de período...")
+            if not self._validar_y_aplicar_periodo():
+                print("Error al aplicar período, análisis cancelado")
+                return  # No continuar si hay error en los valores de período
+            
+            print(f"Período aplicado para análisis: Máx={self.periodo_max}, Mín={self.periodo_min} días")
+            
+            # Usar la función de Analisis.py con parámetros de período
+            exito, mensaje = realizar_analisis_completo(
+                self.table_main, 
+                self.table_descartadas, 
+                self.datos_formulario,
+                periodo_max=self.periodo_max,
+                periodo_min=self.periodo_min
+            )
             
             print(f"=== ANÁLISIS COMPLETADO ===")
             print(f"Éxito: {exito}")
@@ -782,19 +907,6 @@ class DatosNF(QMainWindow):
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Error", error_msg)
-
-    def crear_info_formulario(self):
-        """Crea una cadena con información resumida del formulario"""
-        info_parts = []
-        
-        if 'periodo_max' in self.datos_formulario:
-            info_parts.append(f"P.Max: {self.datos_formulario['periodo_max']} días")
-        if 'periodo_min' in self.datos_formulario:
-            info_parts.append(f"P.Min: {self.datos_formulario['periodo_min']} días")
-        if 'step' in self.datos_formulario:
-            info_parts.append(f"Step: {self.datos_formulario['step']} días")
-        
-        return " | ".join(info_parts) if info_parts else "Parámetros cargados"
 
     def mostrar_datos_formulario(self):
         """Muestra todos los datos recibidos del formulario en la consola para debugging"""

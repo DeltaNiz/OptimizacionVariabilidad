@@ -215,11 +215,13 @@ class WorkerThread(QThread):
     log_agregado = pyqtSignal(str)
     analisis_terminado = pyqtSignal(bool, str)
     
-    def __init__(self, datos_filtrados, datos_formulario, ventana_progreso):
+    def __init__(self, datos_filtrados, datos_formulario, ventana_progreso, periodo_max=3, periodo_min=0.01):
         super().__init__()
         self.datos_filtrados = datos_filtrados
         self.datos_formulario = datos_formulario
         self.ventana_progreso = ventana_progreso
+        self.periodo_max = periodo_max
+        self.periodo_min = periodo_min
         self.proceso_actual = None
         self.cancelacion_forzada = False
         self.data_folder_final = None  # Para guardar la ruta final de los datos
@@ -494,7 +496,7 @@ class WorkerThread(QThread):
             return False, ""
     
     def ejecutar_procesofull_py(self, data_folder):
-        """Ejecuta procesofull.py automáticamente con la carpeta de datos generada"""
+        """Ejecuta procesofull.py automáticamente con la carpeta de datos generada y parámetros de período"""
         try:
             if self.ventana_progreso.cancelado:
                 return False
@@ -505,11 +507,15 @@ class WorkerThread(QThread):
             if not os.path.exists(ruta_procesofull):
                 self.log_agregado.emit(f"ADVERTENCIA: No se encontró procesofull.py")
                 return False
-            
-            # Ejecutar procesofull.py con parámetros y mostrar output en tiempo real
+
+            self.log_agregado.emit(f"<b>Iniciando análisis con período: máx={self.periodo_max}, mín={self.periodo_min}</b>")
+
+            # Ejecutar procesofull.py con parámetros de período y mostrar output en tiempo real
             self.proceso_actual = subprocess.Popen([
                 sys.executable, '-u', ruta_procesofull,  # -u para unbuffered output
-                '--data_folder', data_folder
+                '--data_folder', data_folder,
+                '--pend', str(self.periodo_max),
+                '--pbeg', str(self.periodo_min)
             ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=0, universal_newlines=True)
             
             total_estrellas = 0
@@ -554,7 +560,6 @@ class WorkerThread(QThread):
                                 if not analisis_iniciado:
                                     self.progreso_estrellas.emit(0, total_estrellas)
                                     analisis_iniciado = True
-                                    self.detalle_cambiado.emit(f"Iniciando procesamiento de {total_estrellas} estrellas...")
                         except Exception as e:
                             self.log_agregado.emit(f"[ERROR] Error parseando total de estrellas: {e}")
                     
@@ -565,9 +570,6 @@ class WorkerThread(QThread):
                             if match:
                                 actual = int(match.group(1))
                                 total = int(match.group(2))
-                                porcentaje = float(match.group(3))
-                                exitosas = int(match.group(4))
-                                fallidas = int(match.group(5))
                                 
                                 if total_estrellas == 0:
                                     total_estrellas = total
@@ -575,7 +577,6 @@ class WorkerThread(QThread):
                                 
                                 # Actualizar progreso con el número REAL de estrellas completadas
                                 self.progreso_estrellas.emit(actual, total)
-                                self.detalle_cambiado.emit(f"Completadas: {exitosas}, Fallidas: {fallidas} ({porcentaje:.1f}%)")
                                 
                         except Exception as e:
                             self.log_agregado.emit(f"[ERROR] Error parseando progreso detallado: {e}")
@@ -766,7 +767,7 @@ def obtener_datos_filtrados(table_main, table_descartadas):
     print(f"Datos filtrados: {len(datos_filtrados)} estrellas (de {table_main.rowCount()} originales)")
     return datos_filtrados
 
-def realizar_analisis_completo(table_main, table_descartadas, datos_formulario):
+def realizar_analisis_completo(table_main, table_descartadas, datos_formulario, periodo_max=3, periodo_min=0.01):
     """Método principal para realizar el análisis completo con los datos filtrados"""
     try:
         print("=== INICIANDO ANÁLISIS ===")
@@ -786,7 +787,7 @@ def realizar_analisis_completo(table_main, table_descartadas, datos_formulario):
         ventana_progreso = VentanaProgreso()
         
         # Crear worker thread
-        worker = WorkerThread(datos_filtrados, datos_formulario, ventana_progreso)
+        worker = WorkerThread(datos_filtrados, datos_formulario, ventana_progreso, periodo_max, periodo_min)
         
         # Asignar referencia del worker a la ventana
         ventana_progreso.worker_thread = worker

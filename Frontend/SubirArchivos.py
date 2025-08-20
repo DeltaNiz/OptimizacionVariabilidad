@@ -12,8 +12,8 @@ class AppConstants:
     """Constantes centralizadas para la aplicación SubirArchivos"""
     
     # Dimensiones de la ventana
-    WINDOW_WIDTH = 500
-    WINDOW_HEIGHT = 250
+    WINDOW_WIDTH = 480
+    WINDOW_HEIGHT = 210
     
     # Anchos de componentes
     COMBO_WIDTH = 200
@@ -35,11 +35,6 @@ class AppConstants:
     COLOR_VERDE_PRINCIPAL = "#a7c942"
     COLOR_VERDE_HOVER = "#98b83b"
     COLOR_VERDE_PRESSED = "#7a9530"
-    
-    # Textos de placeholder
-    PLACEHOLDER_PERIODO_MAX = "Ej: 3"
-    PLACEHOLDER_PERIODO_MIN = "Ej: 2"
-    PLACEHOLDER_STEP = "Ej: 0.1"
     
     # Textos de combo por defecto
     COMBO_DEFAULT_FOLDER = "Seleccione una carpeta..."
@@ -185,22 +180,10 @@ class SubirArchivos(QMainWindow):
         # Fila 3: Archivo CSV
         self._create_csv_row(form_layout)
         
-        # Fila 4: Periodo Máx
-        self._create_input_row(form_layout, "periodo_max", "<b>Periodo Máx:</b>", 
-                              AppConstants.PLACEHOLDER_PERIODO_MAX)
-        
-        # Fila 5: Periodo Min
-        self._create_input_row(form_layout, "periodo_min", "<b>Periodo Min:</b>", 
-                              AppConstants.PLACEHOLDER_PERIODO_MIN)
-        
-        # Fila 6: Step
-        self._create_input_row(form_layout, "step", "<b>Step (Saltos):</b>", 
-                              AppConstants.PLACEHOLDER_STEP)
-        
         # Separador
         self._add_separator(form_layout)
         
-        # Fila 7: Botón cargar datos
+        # Fila 4: Botón cargar datos
         self._create_submit_button(form_layout)
 
     def _create_folder_row(self, form_layout, filtro_tipo, label_text):
@@ -441,11 +424,6 @@ class SubirArchivos(QMainWindow):
             if self.combo_csv.toolTip():
                 datos['ruta_completa_csv'] = self.combo_csv.toolTip()
         
-        # Obtener valores numéricos
-        datos['periodo_max'] = self.input_periodo_max.text()
-        datos['periodo_min'] = self.input_periodo_min.text()
-        datos['step'] = self.input_step.text()
-        
         return datos
 
     def abrir_datos_nf(self):
@@ -485,50 +463,6 @@ class SubirArchivos(QMainWindow):
         # Validar archivo CSV
         if self.combo_csv.currentText() == "Seleccione un archivo CSV...":
             errores.append("• Debe seleccionar un archivo CSV de magnitudes")
-        
-        # Validar Periodo Máx
-        if not self.input_periodo_max.text().strip():
-            errores.append("• Debe ingresar un valor para Periodo Máx")
-        else:
-            try:
-                valor = float(self.input_periodo_max.text().strip())
-                if valor <= 0:
-                    errores.append("• Periodo Máx debe ser un número positivo")
-            except ValueError:
-                errores.append("• Periodo Máx debe ser un número válido")
-        
-        # Validar Periodo Min
-        if not self.input_periodo_min.text().strip():
-            errores.append("• Debe ingresar un valor para Periodo Min")
-        else:
-            try:
-                valor = float(self.input_periodo_min.text().strip())
-                if valor <= 0:
-                    errores.append("• Periodo Min debe ser un número positivo")
-            except ValueError:
-                errores.append("• Periodo Min debe ser un número válido")
-        
-        # Validar Step
-        if not self.input_step.text().strip():
-            errores.append("• Debe ingresar un valor para Step (Saltos)")
-        else:
-            try:
-                valor = float(self.input_step.text().strip())
-                if valor <= 0:
-                    errores.append("• Step debe ser un número positivo")
-            except ValueError:
-                errores.append("• Step debe ser un número válido")
-        
-        # Validar lógica de períodos
-        if (self.input_periodo_max.text().strip() and 
-            self.input_periodo_min.text().strip()):
-            try:
-                max_val = float(self.input_periodo_max.text().strip())
-                min_val = float(self.input_periodo_min.text().strip())
-                if max_val <= min_val:
-                    errores.append("• Periodo Máx debe ser mayor que Periodo Min")
-            except ValueError:
-                pass  # Los errores de formato ya se capturaron arriba
         
         # Si hay errores, mostrar mensaje y retornar False
         if errores:

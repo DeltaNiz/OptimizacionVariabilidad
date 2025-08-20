@@ -43,7 +43,7 @@ def get_optimal_workers():
     except:
         return 2  # Fallback seguro
 
-def process_single_star(star_data):
+def process_single_star(star_data, Pend=3, Pbeg=0.01):
     """Procesa una sola estrella de forma independiente"""
     data_folder, star_name = star_data
     
@@ -76,9 +76,8 @@ def process_single_star(star_data):
         flux_i = dataI[:, 1]
         
         # Análisis GLS
-        Pend = 3
-        clp = pyPeriod.Gls((time_v, flux_v), norm="ZK", Pbeg=0.01, Pend=Pend)
-        clpI = pyPeriod.Gls((time_i, flux_i), norm="ZK", Pbeg=0.01, Pend=Pend)
+        clp = pyPeriod.Gls((time_v, flux_v), norm="ZK", Pbeg=Pbeg, Pend=Pend)
+        clpI = pyPeriod.Gls((time_i, flux_i), norm="ZK", Pbeg=Pbeg, Pend=Pend)
         
         # Análisis PDM
         f1, t1 = pdm_with_covers_pypdm_like(
@@ -278,8 +277,14 @@ def main():
     parser = argparse.ArgumentParser(description='Procesar análisis de estrellas en paralelo')
     parser.add_argument('--data_folder', help='Ruta de la carpeta con los datos de las estrellas')
     parser.add_argument('--workers', type=int, help='Número de procesos paralelos (auto-detecta si no se especifica)')
+    parser.add_argument('--pend', type=float, default=3, help='Período máximo para análisis GLS (default: 3)')
+    parser.add_argument('--pbeg', type=float, default=0.01, help='Período mínimo para análisis GLS (default: 0.01)')
     
     args = parser.parse_args()
+    
+    # Usar los parámetros de período desde argumentos
+    periodo_max = args.pend
+    periodo_min = args.pbeg
     
     # Determinar número de workers
     if args.workers:
@@ -328,7 +333,7 @@ def main():
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
             # Enviar todas las tareas
             future_to_star = {
-                executor.submit(process_single_star, star_data): star_data[1] 
+                executor.submit(process_single_star, star_data, periodo_max, periodo_min): star_data[1] 
                 for star_data in star_data_list
             }
             
