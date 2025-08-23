@@ -46,25 +46,35 @@ class Main(QMainWindow):
         
         # Lógica similar a media queries
         if screen_width <= 1366:  # Pantallas pequeñas/laptops
-            self.resize(600, 400)
+            self.resize(480, 200)
             self.setWindowTitle("Nombre de Aplicación - Pantalla Pequeña")
-            margin_size = "150px"  # Menos margen para pantallas pequeñas
+            margin_y_size = "42px"  # Menos margen para pantallas pequeñas
+            margin_x_size = "83px"  # Menos margen para pantallas pequeñas
             text_size = "24px"  # Tamaño de texto más pequeño
-            vertical_offset = -75
+            vertical_offset = -95
+            # Guardar dimensiones para fijar al final
+            self.fixed_width, self.fixed_height = 490, 290
             print(f"Configuración aplicada: Pantalla pequeña - Ventana: {self.width()}x{self.height()}")
+
         elif screen_width <= 1920:  # Pantallas medianas/Full HD
-            self.resize(600, 400)
+            self.resize(600, 280)
             self.setWindowTitle("Nombre de Aplicación - Pantalla Mediana")
-            margin_size = "100px"  # Margen muy pequeño para ventana mediana
+            margin_y_size = "50px"  # Margen muy pequeño para ventana mediana
+            margin_x_size = "100px"  # Margen muy pequeño para ventana mediana
             text_size = "36px"  # Tamaño de texto intermedio
-            vertical_offset = -35
+            vertical_offset = -95
+            # Guardar dimensiones para fijar al (las resoluciones son distintas al resize porque pyqt asi lo quiso xd)
+            self.fixed_width, self.fixed_height = 600, 330
             print(f"Configuración aplicada: Pantalla mediana - Ventana: {self.width()}x{self.height()}")
+
         else:  # Pantallas grandes/4K
             self.resize(1600, 1000)
             self.setWindowTitle("Nombre de Aplicación - Pantalla Grande")
             margin_size = "300px"  # Margen grande para pantallas grandes
             text_size = "42px"  # Tamaño de texto grande
             vertical_offset = -20
+            # Guardar dimensiones para fijar al final
+            self.fixed_width, self.fixed_height = 1600, 1000
             print(f"Configuración aplicada: Pantalla grande - Ventana: {self.width()}x{self.height()}")
         
         # Centrar la ventana en la pantalla con un offset vertical
@@ -109,7 +119,10 @@ class Main(QMainWindow):
                 padding: 40px;
                 border-radius: 20px;  /* Esquinas redondeadas */
                 border: 3px solid #98b83b;  /* Borde verde más oscuro */
-                margin: {margin_size};
+                margin-left: {margin_x_size};
+                margin-right: {margin_x_size};
+                margin-top: {margin_y_size};
+                margin-bottom: {margin_y_size};
             }}
         """)
         
@@ -143,6 +156,8 @@ class Main(QMainWindow):
         # Establecer el contenedor como widget central
         self.setCentralWidget(container_widget)
         
+        # Hacer la ventana no redimensionable AL FINAL
+        self.setFixedSize(self.fixed_width, self.fixed_height)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

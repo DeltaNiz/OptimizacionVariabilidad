@@ -247,8 +247,12 @@ class DatosF(QMainWindow):
         if self.ventana_maximizada:
             QTimer.singleShot(50, self.asegurar_maximizacion)
         else:
-            # Si no se maximiza automáticamente, centrar la ventana en la pantalla
+            # Para pantallas medianas y grandes: centrar y hacer no redimensionable
             QTimer.singleShot(50, self.centrar_ventana)
+            # Hacer la ventana no redimensionable después de configurar el layout
+            # (solo para pantallas medianas y grandes, pantallas pequeñas mantienen redimensionamiento)
+            if hasattr(self, 'window_size') and self.window_size:
+                self.setFixedSize(*self.window_size)
     
     def centrar_ventana(self):
         """Centra la ventana en la pantalla con un pequeño offset en altura"""
@@ -272,15 +276,16 @@ class DatosF(QMainWindow):
         if screen_width <= AppConstants.SCREEN_SMALL:
             # Para pantallas pequeñas, marcar para maximizar automáticamente
             self.ventana_maximizada = True
+            self.window_size = None  # No hay tamaño fijo para pantallas pequeñas
             layout_margin = 5
             print(f"Pantalla pequeña detectada ({screen_width}px) - Ventana será maximizada automáticamente")
         elif screen_width <= AppConstants.SCREEN_MEDIUM:
             self.ancho_celda = AppConstants.ANCHO_CELDA_SCREEN_1920
             self.ancho_celda_1 = AppConstants.ANCHO_CELDA_PRIMERA_1920
-            self.resize(*AppConstants.WINDOW_MEDIUM)
+            self.window_size = AppConstants.WINDOW_MEDIUM
             layout_margin = 5
         else:
-            self.resize(*AppConstants.WINDOW_LARGE)
+            self.window_size = AppConstants.WINDOW_LARGE
             layout_margin = 20
         return layout_margin
 
@@ -658,11 +663,10 @@ class DatosF(QMainWindow):
             print("Ventana forzada a maximizar para pantalla pequeña")
     
     def resizeEvent(self, event):
-        """Sobrescribe el evento de redimensionamiento para mantener maximización"""
+        """Sobrescribe el evento de redimensionamiento"""
         super().resizeEvent(event)
-        # Si la ventana debe estar maximizada pero no lo está, restaurar maximización
-        if self.ventana_maximizada and not self.isMaximized():
-            QTimer.singleShot(10, self.showMaximized)
+        # No forzar maximización en resizeEvent para permitir redimensionamiento libre
+        # en pantallas pequeñas. La maximización inicial se maneja en asegurar_maximizacion()
 
     def actualizar_titulo(self):
         """Actualiza el título con el número de estrella actual"""

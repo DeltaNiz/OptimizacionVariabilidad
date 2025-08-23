@@ -20,8 +20,8 @@ class AppConstants:
     SCREEN_MEDIUM = 1920
     
     # Dimensiones de ventana por tipo de pantalla
-    WINDOW_SMALL = (1133, 600)
-    WINDOW_MEDIUM = (1113, 800)
+    WINDOW_SMALL = (1175, 600)
+    WINDOW_MEDIUM = (1159, 800)
     WINDOW_LARGE = (1600, 1000)
     
     # Headers de tablas
@@ -40,11 +40,11 @@ class AppConstants:
     
     # Configuraciones de columnas - Tabla Descartadas
     COL_WIDTH_DESC = {
-        0: 53,   # N°
-        1: 84,   # V
-        2: 84,   # I
-        3: 84,   # MV
-        4: 84    # MI
+        0: 50,   # N°
+        1: 87,   # V
+        2: 87,   # I
+        3: 87,   # MV
+        4: 87    # MI
     }
     
     # Alturas de filas
@@ -265,9 +265,9 @@ class DatosNF(QMainWindow):
         separator = self._create_vertical_separator()
         
         # Ensamblar layout principal
-        main_layout.addWidget(self.table_main, 13)
+        main_layout.addWidget(self.table_main, 19)
         main_layout.addWidget(separator, 0)
-        main_layout.addLayout(right_layout, 8)
+        main_layout.addLayout(right_layout, 13)
         
         central_widget.setLayout(main_layout)
         
@@ -276,26 +276,29 @@ class DatosNF(QMainWindow):
         
         # Actualizar información final
         self.actualizar_info_estrellas()
+        
+        # Hacer la ventana no redimensionable después de configurar el layout
+        self.setFixedSize(*self.window_size)
 
     def _configure_screen_layout(self):
         """Configura el layout según el tamaño de pantalla"""
         screen_width = self.screen().size().width()
         
         if screen_width <= AppConstants.SCREEN_SMALL:
-            self.resize(*AppConstants.WINDOW_SMALL)
+            self.window_size = AppConstants.WINDOW_SMALL
             self.setWindowTitle("Optim. Estrellas - Pantalla Pequeña")
-            layout_margin = 10
-            print(f"Configuración aplicada: Pantalla pequeña - Ventana: {self.width()}x{self.height()}")
+            layout_margin = 9
+            print(f"Configuración aplicada: Pantalla pequeña - Ventana: {self.window_size[0]}x{self.window_size[1]}")
         elif screen_width <= AppConstants.SCREEN_MEDIUM:
-            self.resize(*AppConstants.WINDOW_MEDIUM)
+            self.window_size = AppConstants.WINDOW_MEDIUM
             self.setWindowTitle("Optim. Estrellas - Pantalla Mediana")
             layout_margin = 5
-            print(f"Configuración aplicada: Pantalla mediana - Ventana: {self.width()}x{self.height()}")
+            print(f"Configuración aplicada: Pantalla mediana - Ventana: {self.window_size[0]}x{self.window_size[1]}")
         else:
-            self.resize(*AppConstants.WINDOW_LARGE)
+            self.window_size = AppConstants.WINDOW_LARGE
             self.setWindowTitle("Optim. Estrellas - Pantalla Grande")
             layout_margin = 20
-            print(f"Configuración aplicada: Pantalla grande - Ventana: {self.width()}x{self.height()}")
+            print(f"Configuración aplicada: Pantalla grande - Ventana: {self.window_size[0]}x{self.window_size[1]}")
         
         return layout_margin
 
@@ -403,6 +406,9 @@ class DatosNF(QMainWindow):
         
         # Configurar eventos y estilos
         self.table_descartadas.verticalHeader().setVisible(False)
+        
+        # Hacer que el scroll vertical aparezca siempre
+        self.table_descartadas.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         
         # Hacer la tabla no editable
         self.table_descartadas.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -1060,17 +1066,22 @@ class DatosNF(QMainWindow):
 
     def _agregar_checkbox_descarte(self, row):
         """Agrega el checkbox de descarte en la última columna"""
+        checkbox_widget = QWidget()
         checkbox = QCheckBox()
-        checkbox.setStyleSheet(StyleSheets.CHECKBOX)
+        checkbox.setText("")
+        checkbox.setStyleSheet(StyleSheets.CHECKBOX + """
+            QCheckBox {
+                spacing: 0px;       /* elimina espacio entre indicador y texto */
+                padding-left: 0px;  /* elimina margen a la izquierda */
+            }
+        """)
         checkbox.stateChanged.connect(lambda state, r=row: self.on_checkbox_descarte_changed(state, r))
         
         # Crear widget contenedor centrado
-        checkbox_widget = QWidget()
-        checkbox_layout = QHBoxLayout(checkbox_widget)
-        checkbox_layout.addWidget(checkbox)
-        checkbox_layout.setAlignment(Qt.AlignCenter)
-        checkbox_layout.setContentsMargins(0, 0, 0, 0)
-        
+        layout = QHBoxLayout(checkbox_widget)
+        layout.addWidget(checkbox, alignment=Qt.AlignCenter)
+        layout.setContentsMargins(0, 0, 0, 0)
+
         self.table_main.setCellWidget(row, 5, checkbox_widget)
 
     def _configurar_tabla_final(self):
