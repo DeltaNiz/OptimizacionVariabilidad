@@ -7,9 +7,6 @@ import os
 import subprocess
 from datetime import datetime
 import re
-import time
-import importlib.util
-import traceback
 
 class AppConstants:
     """Clase centralizada para todas las constantes del proyecto"""
@@ -42,7 +39,6 @@ class AppConstants:
         'archivo_estrella': re.compile(r'\b(\d+\.(txt|dat))\b'),
         'archivo_numero': re.compile(r'\b\d+\.(txt|dat)\b'),
         'procesamiento_completado': re.compile(r'Procesamiento completado\.'),
-        'resumen_final': re.compile(r'=== RESUMEN FINAL ===')
     }
 
 class VentanaProgreso(QDialog):
@@ -106,6 +102,9 @@ class VentanaProgreso(QDialog):
         # Variable para controlar cancelación
         self.cancelado = False
         
+        # Variable para almacenar datos de DatosF para abrir al cerrar
+        self.datos_para_datosf = None
+        
     def cancelar_analisis(self):
         """Solicita cancelación del análisis"""
         respuesta = QMessageBox.question(
@@ -118,8 +117,8 @@ class VentanaProgreso(QDialog):
         
         if respuesta == QMessageBox.Yes:
             self.cancelado = True
-            self.label_estado.setText("Cancelando análisis...")
-            self.label_progreso_estrellas.setText("Cancelando...")
+            self.label_estado.setText("🚫 CANCELANDO ANÁLISIS...")
+            self.label_progreso_estrellas.setText("Terminando procesos...")
             self.btn_cancelar.setEnabled(False)
             self.agregar_log("--- CANCELACIÓN SOLICITADA POR EL USUARIO ---")
             self.agregar_log("Terminando procesos en curso...")
@@ -134,6 +133,8 @@ class VentanaProgreso(QDialog):
             # Forzar actualización inmediata de la interfaz
             self.repaint()
             QApplication.processEvents()
+            
+            self.agregar_log("Cancelación en progreso, por favor espera...")
         
     def actualizar_estado(self, texto, progreso=None):
         """Actualiza el estado del análisis"""
@@ -205,6 +206,62 @@ class VentanaProgreso(QDialog):
             self.btn_cancelar.setEnabled(False)
         self.btn_cerrar.setEnabled(True)
         QApplication.processEvents()
+    
+    def accept(self):
+        """Sobrescribir accept para abrir DatosF al cerrar si está disponible"""
+        print("=== CERRANDO VENTANA DE PROGRESO ===")
+        
+        # Si hay datos para abrir DatosF, abrirlo antes de cerrar
+        if self.datos_para_datosf:
+            print("Abriendo ventana DatosF...")
+            try:
+                self._abrir_datosf(self.datos_para_datosf)
+                print("Ventana DatosF abierta exitosamente")
+            except Exception as e:
+                print(f"ERROR al abrir ventana DatosF: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Llamar al accept original para cerrar la ventana
+        super().accept()
+    
+    def _abrir_datosf(self, datos):
+        """Método para abrir la ventana DatosF"""
+        import sys
+        import os
+        import importlib.util
+        
+        # Importar DatosF desde Frontend
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        frontend_path = os.path.join(script_dir, 'Frontend')
+        if frontend_path not in sys.path:
+            sys.path.append(frontend_path)
+        
+        print("Importando módulo DatosF...")
+        datosf_path = os.path.join(frontend_path, 'DatosF.py')
+        spec = importlib.util.spec_from_file_location("DatosF", datosf_path)
+        datosf_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(datosf_module)
+        
+        # Crear y mostrar ventana DatosF
+        print("Creando y mostrando ventana DatosF...")
+        ventana_resultados = datosf_module.DatosF(
+            data_folder=datos['data_folder'],
+            datos_formulario=datos['datos_formulario'],
+            ventana_anterior=None,
+            ruta_csv_filtrado=datos.get('ruta_csv', None)
+        )
+        
+        ventana_resultados.show()
+        ventana_resultados.raise_()
+        ventana_resultados.activateWindow()
+        
+        # Guardar referencia para evitar que se cierre automáticamente
+        app = QApplication.instance()
+        if app:
+            if not hasattr(app, '_ventana_resultados'):
+                app._ventana_resultados = []
+            app._ventana_resultados.append(ventana_resultados)
 
 class WorkerThread(QThread):
     # Señales para comunicarse con la interfaz
@@ -232,60 +289,59 @@ class WorkerThread(QThread):
     def forzar_cancelacion(self):
         """Fuerza la cancelación inmediata"""
         self.cancelacion_forzada = True
+        self.log_agregado.emit("=== CANCELACIÓN FORZADA ===")
+        
+        # Limpiar archivos temporales inmediatamente
         self._limpiar_archivos_temporales()
-        if self.proceso_actual and self.proceso_actual.poll() is None:
+        
+        # Terminar cualquier proceso en ejecución
+        if hasattr(self, 'proceso_actual') and self.proceso_actual and self.proceso_actual.poll() is None:
             try:
                 self.proceso_actual.kill()  # Terminación inmediata
-                self.log_agregado.emit("Proceso terminado inmediatamente")
-            except:
-                pass
-        
-    def cancelar(self):
-        """Cancela el proceso actual"""
-        self._limpiar_archivos_temporales()
-        if self.proceso_actual and self.proceso_actual.poll() is None:
-            try:
-                # Intentar terminación suave primero
-                self.proceso_actual.terminate()
-                self.log_agregado.emit("Terminando proceso...")
-                
-                # Usar QTimer en lugar de time.sleep para no bloquear la UI
-                QTimer.singleShot(1000, self._verificar_terminacion)
+                self.log_agregado.emit("Proceso externo terminado inmediatamente")
             except Exception as e:
                 self.log_agregado.emit(f"Error al terminar proceso: {e}")
-                self._forzar_terminacion()
-    
-    def _verificar_terminacion(self):
-        """Verifica si el proceso terminó suavemente, sino lo fuerza"""
-        if self.proceso_actual and self.proceso_actual.poll() is None:
-            self._forzar_terminacion()
-        else:
-            self.log_agregado.emit("Proceso terminado correctamente")
+        
+        # Emitir señal de terminación inmediatamente
+        self.log_agregado.emit("Terminando análisis...")
+        self.analisis_terminado.emit(False, "Análisis cancelado por el usuario")
+        
+        # Terminar el hilo
+        self.quit()
     
     def _forzar_terminacion(self):
-        """Fuerza la terminación del proceso"""
+        """
+        Fuerza la terminación inmediata del proceso actual
+        Utilizado durante cancelaciones para asegurar terminación rápida
+        """
         try:
-            if self.proceso_actual:
+            if hasattr(self, 'proceso_actual') and self.proceso_actual:
                 self.proceso_actual.kill()
                 self.log_agregado.emit("Proceso terminado forzosamente")
-        except:
-            pass
+        except Exception as e:
+            self.log_agregado.emit(f"Error al terminar proceso: {e}")
     
-    def _limpiar_archivos_temporales(self):
-        """Limpia archivos temporales y carpetas creadas durante el análisis (para cancelaciones)"""
+    def _limpiar_archivos_temporales(self, incluir_carpeta_analisis=True):
+        """
+        Limpia archivos temporales creados durante el análisis
+        
+        Args:
+            incluir_carpeta_analisis (bool): 
+                - True: Limpia CSV temporal Y carpeta de análisis (para cancelaciones/errores)
+                - False: Solo limpia CSV temporal (para análisis exitosos, conserva carpeta)
+        """
         archivos_eliminados = 0
         
-        # Limpiar CSV temporal
+        # Limpiar CSV temporal (siempre)
         if self.ruta_csv_temporal and os.path.exists(self.ruta_csv_temporal):
             try:
                 os.remove(self.ruta_csv_temporal)
-                self.log_agregado.emit(f"Archivo CSV temporal eliminado: {os.path.basename(self.ruta_csv_temporal)}")
                 archivos_eliminados += 1
             except Exception as e:
                 self.log_agregado.emit(f"No se pudo eliminar archivo temporal: {e}")
         
-        # Limpiar carpeta de análisis si fue creada
-        if self.carpeta_analisis_creada and os.path.exists(self.carpeta_analisis_creada):
+        # Limpiar carpeta de análisis solo si se solicita
+        if incluir_carpeta_analisis and self.carpeta_analisis_creada and os.path.exists(self.carpeta_analisis_creada):
             try:
                 import shutil
                 shutil.rmtree(self.carpeta_analisis_creada)
@@ -295,23 +351,11 @@ class WorkerThread(QThread):
             except Exception as e:
                 self.log_agregado.emit(f"No se pudo eliminar carpeta de análisis: {e}")
         
-        if archivos_eliminados > 0:
-            self.log_agregado.emit(f"Limpieza completada: {archivos_eliminados} elemento(s) eliminado(s)")
-    
-    def _limpiar_solo_csv_temporal(self):
-        """Limpia solo el CSV temporal (para finalizaciones exitosas)"""
-        if self.ruta_csv_temporal and os.path.exists(self.ruta_csv_temporal):
-            try:
-                os.remove(self.ruta_csv_temporal)
-                self.log_agregado.emit(f"Archivo CSV temporal eliminado: {os.path.basename(self.ruta_csv_temporal)}")
-            except Exception as e:
-                self.log_agregado.emit(f"No se pudo eliminar archivo temporal: {e}")
-        
     def run(self):
         """Ejecuta el análisis en un hilo separado"""
         try:
             # Verificar cancelación antes de cada paso
-            if self.ventana_progreso.cancelado:
+            if self.ventana_progreso.cancelado or self.cancelacion_forzada:
                 self.analisis_terminado.emit(False, "Análisis cancelado por el usuario")
                 return
                 
@@ -371,26 +415,26 @@ class WorkerThread(QThread):
             exito_proceso = self.ejecutar_procesofull_py(data_folder)
             
             if self.ventana_progreso.cancelado:
-                self._limpiar_archivos_temporales()
+                self._limpiar_archivos_temporales()  # Limpieza completa (CSV + carpeta) por cancelación
                 self.analisis_terminado.emit(False, "Análisis cancelado por el usuario")
                 return
             
             if exito_proceso:
                 # Limpiar solo el archivo CSV temporal (conservar carpeta de análisis)
-                self._limpiar_solo_csv_temporal()
+                self._limpiar_archivos_temporales(incluir_carpeta_analisis=False)
                 
                 # Mostrar progreso completo al final
                 self.fase_analisis.emit("¡Análisis completado exitosamente!", 100)
                 mensaje_exito = f"Análisis completado exitosamente\n\nCSV generado: {os.path.basename(ruta_csv)}\nEstrellas procesadas: {len(self.datos_filtrados)}\nSubcarpeta: data/{nombre_subcarpeta}"
                 self.analisis_terminado.emit(True, mensaje_exito)
             else:
-                # Limpiar archivo CSV temporal en caso de fallo
-                self._limpiar_archivos_temporales()
+                # Limpiar archivo CSV temporal en caso de fallo (conservar carpeta para depuración)
+                self._limpiar_archivos_temporales(incluir_carpeta_analisis=False)
                 mensaje_error = f"CSV generado correctamente, pero hubo errores en el procesamiento\n\nCSV: {os.path.basename(ruta_csv)}\nSubcarpeta: data/{nombre_subcarpeta}"
                 self.analisis_terminado.emit(False, mensaje_error)
                 
         except Exception as e:
-            self._limpiar_archivos_temporales()
+            self._limpiar_archivos_temporales()  # Limpieza completa (CSV + carpeta) por error inesperado
             self.log_agregado.emit(f"ERROR: {str(e)}")
             self.analisis_terminado.emit(False, f"Error inesperado: {str(e)}")
     
@@ -529,7 +573,7 @@ class WorkerThread(QThread):
                 # Verificar cancelación periódicamente
                 if self.ventana_progreso.cancelado or self.cancelacion_forzada:
                     self.log_agregado.emit("Cancelación detectada, terminando proceso...")
-                    self.cancelar()
+                    self._forzar_terminacion()  # Terminación inmediata
                     return False
                 
                 # Leer línea con verificación de cancelación frecuente
@@ -544,7 +588,7 @@ class WorkerThread(QThread):
                 # Verificar cancelación después de cada línea leída
                 if self.ventana_progreso.cancelado or self.cancelacion_forzada:
                     self.log_agregado.emit("Cancelación detectada durante lectura, terminando proceso...")
-                    self.cancelar()
+                    self._forzar_terminacion()  # Terminación inmediata
                     return False
                     
                 if output:
@@ -641,9 +685,6 @@ class WorkerThread(QThread):
                         except Exception as e:
                             self.log_agregado.emit(f"[ERROR] Error parseando error de estrella: {e}")
                     
-                    # Detectar resumen final
-                    elif "=== RESUMEN FINAL ===" in linea:
-                        self.detalle_cambiado.emit("Generando resumen final...")
                     
                     # Detectar procesamiento completado
                     elif "Procesamiento completado." in linea:
@@ -689,14 +730,14 @@ class WorkerThread(QThread):
                 return False
             
             if rc == 0:
-                self.log_agregado.emit("ÉXITO: Procesamiento de estrellas completado")
+                self.log_agregado.emit("<b>Procesamiento completado</b>")
                 return True
             else:
-                self.log_agregado.emit(f"ERROR: Código de retorno: {rc}")
+                self.log_agregado.emit(f"<b>ERROR: Código de retorno: {rc}</b>")
                 return False
                 
         except Exception as e:
-            self.log_agregado.emit(f"ERROR al ejecutar procesofull.py: {e}")
+            self.log_agregado.emit(f"<b>ERROR al ejecutar procesofull.py: {e}</b>")
             return False
 
 class Analisis(QMainWindow):
@@ -809,100 +850,22 @@ def realizar_analisis_completo(table_main, table_descartadas, datos_formulario, 
             print(f"Cancelado: {ventana_progreso.cancelado}")
             
             if ventana_progreso.cancelado:
-                print("Análisis cancelado, no abriendo DatosF")
+                print("Análisis cancelado")
                 ventana_progreso.analisis_completado(exito=False, cancelado=True)
             else:
+                print("Análisis completado. Puedes cerrar la ventana para continuar.")
                 ventana_progreso.analisis_completado(exito)
                 
-                # Si el análisis fue exitoso, abrir ventana DatosF
-                if exito and hasattr(worker, 'data_folder_final'):
-                    print(f"Intentando abrir ventana DatosF...")
-                    print(f"data_folder_final: {worker.data_folder_final}")
-                    print(f"ruta_csv_generado: {getattr(worker, 'ruta_csv_generado', 'No disponible')}")
-                    
-                    try:
-                        # Importar DatosF desde Frontend
-                        script_dir = os.path.dirname(os.path.abspath(__file__))
-                        frontend_path = os.path.join(script_dir, 'Frontend')
-                        if frontend_path not in sys.path:
-                            sys.path.append(frontend_path)
-                        
-                        import importlib.util
-                        
-                        print("Importando módulo DatosF...")
-                        datosf_path = os.path.join(frontend_path, 'DatosF.py')
-                        spec = importlib.util.spec_from_file_location("DatosF", datosf_path)
-                        datosf_module = importlib.util.module_from_spec(spec)
-                        spec.loader.exec_module(datosf_module)
-                        
-                        # Crear y mostrar ventana DatosF
-                        print("Creando instancia de DatosF...")
-                        ventana_resultados = datosf_module.DatosF(
-                            data_folder=worker.data_folder_final,
-                            datos_formulario=datos_formulario,
-                            ventana_anterior=None,
-                            ruta_csv_filtrado=worker.ruta_csv_generado if hasattr(worker, 'ruta_csv_generado') else None
-                        )
-                        
-                        print("Mostrando ventana DatosF...")
-                        # Configurar ventana con máxima prioridad y siempre encima
-                        ventana_resultados.setWindowModality(Qt.NonModal)
-                        ventana_resultados.setWindowFlags(ventana_resultados.windowFlags() | Qt.WindowStaysOnTopHint)
-                        ventana_resultados.show()
-                        ventana_resultados.raise_()
-                        ventana_resultados.activateWindow()
-                        
-                        # Procesar eventos para asegurar que la ventana se muestre
-                        app = QApplication.instance()
-                        if app:
-                            app.processEvents()
-                        
-                        # Forzar el foco múltiples veces con procesamiento de eventos
-                        ventana_resultados.setWindowState(ventana_resultados.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
-                        ventana_resultados.raise_()
-                        ventana_resultados.activateWindow()
-                        
-                        if app:
-                            app.processEvents()
-                        
-                        # Quitar la bandera "always on top" después de mostrarse para comportamiento normal
-                        from PyQt5.QtCore import QTimer
-                        def quitar_always_on_top():
-                            ventana_resultados.setWindowFlags(ventana_resultados.windowFlags() & ~Qt.WindowStaysOnTopHint)
-                            ventana_resultados.show()
-                        
-                        QTimer.singleShot(1000, quitar_always_on_top)  # Quitar después de 1 segundo
-                        
-                        print(f"[OK] Ventana DatosF abierta exitosamente con datos de: {worker.data_folder_final}")
-                        print(f"[OK] CSV filtrado en: {worker.ruta_csv_generado if hasattr(worker, 'ruta_csv_generado') else 'No especificado'}")
-                        
-                        # Guardar referencia para evitar que se cierre automáticamente
-                        if not hasattr(app, '_ventana_resultados'):
-                            app._ventana_resultados = []
-                        app._ventana_resultados.append(ventana_resultados)
-                        
-                        # Actualizar resultado final con mensaje de éxito de DatosF
-                        resultado_final[0] = True
-                        resultado_final[1] = f"[OK] Ventana DatosF abierta exitosamente con datos de: {worker.data_folder_final}"
-                        
-                        # Cerrar automáticamente la ventana de progreso después de un breve retraso
-                        from PyQt5.QtCore import QTimer
-                        def cerrar_ventana_progreso():
-                            print("Cerrando ventana de progreso automáticamente...")
-                            ventana_progreso.close()
-                        
-                        QTimer.singleShot(1500, cerrar_ventana_progreso)  # 1.5 segundos de retraso
-                        
-                    except Exception as e:
-                        print(f"ERROR al abrir ventana DatosF: {e}")
-                        import traceback
-                        traceback.print_exc()
-                else:
-                    print("No se pudo abrir DatosF:")
-                    print(f"  - Éxito: {exito}")
-                    print(f"  - Tiene data_folder_final: {hasattr(worker, 'data_folder_final')}")
-                    if hasattr(worker, 'data_folder_final'):
-                        print(f"  - Valor data_folder_final: {worker.data_folder_final}")
+            # Guardar información del análisis para abrir DatosF después del cierre
+            if exito and hasattr(worker, 'data_folder_final'):
+                ventana_progreso.datos_para_datosf = {
+                    'data_folder': worker.data_folder_final,
+                    'datos_formulario': datos_formulario,
+                    'ruta_csv': getattr(worker, 'ruta_csv_generado', None)
+                }
+                print("Información guardada para abrir DatosF al cerrar la ventana.")
+            else:
+                ventana_progreso.datos_para_datosf = None
                         
             resultado_final[0] = exito
             resultado_final[1] = mensaje
@@ -913,19 +876,32 @@ def realizar_analisis_completo(table_main, table_descartadas, datos_formulario, 
         # Iniciar el worker
         worker.start()
         
-        # Mostrar ventana de progreso y permitir que el análisis continúe
+        # Mostrar ventana de progreso para el bucle de procesamiento
         ventana_progreso.show()
         
         # Procesar eventos mientras el worker ejecuta
         while worker.isRunning():
             app.processEvents()
             if ventana_progreso.cancelado:
+                print("=== CANCELACIÓN DETECTADA ===")
+                worker.forzar_cancelacion()  # Forzar cancelación del worker
                 break
         
         # Asegurar que el worker termine limpiamente
         if worker.isRunning():
+            print("Terminando worker thread...")
             worker.quit()
             worker.wait(5000)  # Esperar máximo 5 segundos
+            if worker.isRunning():
+                print("Worker no terminó, terminando forzadamente...")
+                worker.terminate()
+                worker.wait(2000)
+        
+        # Si fue cancelado, retornar inmediatamente sin mostrar la ventana modal
+        if ventana_progreso.cancelado:
+            print("=== ANÁLISIS CANCELADO - RETORNANDO INMEDIATAMENTE ===")
+            ventana_progreso.hide()  # Ocultar la ventana
+            return False, "Análisis cancelado por el usuario"
         
         # Esperar a que el callback se ejecute completamente
         timeout_counter = 0
@@ -935,7 +911,11 @@ def realizar_analisis_completo(table_main, table_descartadas, datos_formulario, 
             import time
             time.sleep(0.1)
         
+        # Usar exec_() para hacer la ventana modal y esperar hasta que se cierre manualmente
+        result = ventana_progreso.exec_()  # Esto bloquea hasta que el usuario cierre la ventana
+        
         print(f"=== RETORNANDO RESULTADO ===")
+        print(f"Ventana cerrada por el usuario con resultado: {result}")
         print(f"Callback ejecutado: {callback_ejecutado[0]}")
         print(f"resultado_final[0]: {resultado_final[0]}")
         print(f"resultado_final[1]: {resultado_final[1]}")

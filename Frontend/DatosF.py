@@ -4,11 +4,10 @@ from PyQt5.QtWidgets import (
     QFrame, QScrollArea, QMessageBox, QFileDialog
 )
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QCursor, QPixmap, QColor
+from PyQt5.QtGui import QCursor, QPixmap
 import os
 import sys
 import pandas as pd
-import traceback
 
 # Constantes de la aplicación
 class AppConstants:
@@ -247,6 +246,26 @@ class DatosF(QMainWindow):
         # Maximizar la ventana al final si está marcado para pantallas pequeñas
         if self.ventana_maximizada:
             QTimer.singleShot(50, self.asegurar_maximizacion)
+        else:
+            # Si no se maximiza automáticamente, centrar la ventana en la pantalla
+            QTimer.singleShot(50, self.centrar_ventana)
+    
+    def centrar_ventana(self):
+        """Centra la ventana en la pantalla con un pequeño offset en altura"""
+        try:
+            from PyQt5.QtWidgets import QApplication
+            desktop = QApplication.desktop()
+            screen_geometry = desktop.screenGeometry()
+            
+            # Calcular posición central con offset en altura
+            x = (screen_geometry.width() - self.width()) // 2
+            y = (screen_geometry.height() - self.height()) // 2 - 50  # Offset de 50px hacia arriba
+            
+            # Posicionar la ventana en el centro
+            self.move(max(0, x), max(0, y))
+            print(f"Ventana DatosF centrada en posición ({x}, {y}) con offset")
+        except Exception as e:
+            print(f"Error al centrar ventana: {e}")
 
     def _configure_screen_layout(self, screen_width):
         """Configura el layout según el tamaño de pantalla"""
@@ -273,6 +292,9 @@ class DatosF(QMainWindow):
 
         # Ocultar la numeración automática de filas
         self.table_main.verticalHeader().setVisible(False)
+        
+        # Hacer la tabla no editable
+        self.table_main.setEditTriggers(QTableWidget.NoEditTriggers)
         
         # Instalar filtro de eventos para limpiar selección al hacer clic fuera de la tabla
         self.table_main.viewport().installEventFilter(self)

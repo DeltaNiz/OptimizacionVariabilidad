@@ -15,7 +15,6 @@ import argparse
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
 #import psutil
-import logging
 import traceback
 
 def get_optimal_workers():
@@ -413,17 +412,14 @@ def main():
         speedup = 1
     
     # Imprimir resumen final compatible con GUI
-    print("=" * 70)
-    print("=== RESUMEN FINAL ===")
+
     print(f"Total de estrellas: {total_stars}")
     print(f"Procesadas exitosamente: {successful_stars}")
     print(f"Fallidas: {failed_stars}")
     print(f"Tasa de éxito: {(successful_stars/total_stars)*100:.1f}%")
-    print(f"Tiempo total de ejecución: {tiempo_total:.2f} minutos")
-    print(f"Tiempo promedio por estrella: {avg_time_per_star:.2f} segundos")
+    print(f"<b>Tiempo total de ejecución: {tiempo_total:.2f} minutos</b>")
+    print(f"<b>Tiempo promedio por estrella: {avg_time_per_star:.2f} segundos</b>")
     print(f"Speedup logrado: {speedup:.1f}x")
-    print(f"Workers utilizados: {num_workers}")
-    print("=" * 70)
     
     # Guardar reporte detallado
     try:
@@ -442,8 +438,6 @@ def main():
             print(f"  - {result['star']}: {result.get('message', 'Error desconocido')}")
         if len(failed_results) > 10:
             print(f"  ... y {len(failed_results) - 10} más")
-    
-    print("Procesamiento completado.")
 
 if __name__ == "__main__":
     main()

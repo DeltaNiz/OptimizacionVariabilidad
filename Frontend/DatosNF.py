@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (
     QTableWidget, QTableWidgetItem, QPushButton, QLabel,
     QLineEdit, QFrame, QCheckBox, QMessageBox
 )
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QCursor, QColor
 import sys
 import pandas as pd
@@ -309,6 +309,9 @@ class DatosNF(QMainWindow):
         # Ocultar numeración automática de filas
         self.table_main.verticalHeader().setVisible(False)
         
+        # Hacer la tabla no editable
+        self.table_main.setEditTriggers(QTableWidget.NoEditTriggers)
+        
         # Instalar filtros de eventos
         self.table_main.viewport().installEventFilter(self)
         self.table_main.itemClicked.connect(self.on_table_main_item_clicked)
@@ -400,6 +403,10 @@ class DatosNF(QMainWindow):
         
         # Configurar eventos y estilos
         self.table_descartadas.verticalHeader().setVisible(False)
+        
+        # Hacer la tabla no editable
+        self.table_descartadas.setEditTriggers(QTableWidget.NoEditTriggers)
+        
         self.table_descartadas.viewport().installEventFilter(self)
         self.table_descartadas.itemClicked.connect(self.on_table_descartadas_item_clicked)
         
