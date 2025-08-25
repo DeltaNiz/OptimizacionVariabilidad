@@ -20,7 +20,7 @@ class AppConstants:
     SCREEN_MEDIUM = 1920
     
     # Dimensiones de ventana por tipo de pantalla
-    WINDOW_SMALL = (1175, 600)
+    WINDOW_SMALL = (1175, 666)
     WINDOW_MEDIUM = (1159, 800)
     WINDOW_LARGE = (1600, 1000)
     
@@ -279,6 +279,26 @@ class DatosNF(QMainWindow):
         
         # Hacer la ventana no redimensionable después de configurar el layout
         self.setFixedSize(*self.window_size)
+        
+        # Centrar la ventana en la pantalla con un pequeño offset vertical
+        self.centrar_ventana()
+
+    def centrar_ventana(self):
+        """Centra la ventana en la pantalla con un pequeño offset en altura"""
+        try:
+            from PyQt5.QtWidgets import QApplication
+            desktop = QApplication.desktop()
+            screen_geometry = desktop.screenGeometry()
+            
+            # Calcular posición central con offset en altura
+            x = (screen_geometry.width() - self.width()) // 2
+            y = (screen_geometry.height() - self.height()) // 2 - 50  # Offset de 50px hacia arriba
+
+            # Posicionar la ventana en el centro
+            self.move(max(0, x), max(0, y))
+
+        except Exception as e:
+            print(f"Error al centrar ventana: {e}")
 
     def _configure_screen_layout(self):
         """Configura el layout según el tamaño de pantalla"""
@@ -864,7 +884,8 @@ class DatosNF(QMainWindow):
                 self.table_descartadas, 
                 self.datos_formulario,
                 periodo_max=self.periodo_max,
-                periodo_min=self.periodo_min
+                periodo_min=self.periodo_min,
+                ventana_subir=self.ventana_subir
             )
             
             print(f"=== ANÁLISIS COMPLETADO ===")

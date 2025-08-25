@@ -185,11 +185,12 @@ class StyleSheets:
     SEPARATOR = "QFrame { color: #a7c942; background-color: #a7c942; }"
 
 class DatosF(QMainWindow):
-    def __init__(self, data_folder=None, datos_formulario=None, ventana_anterior=None, ruta_csv_filtrado=None):
+    def __init__(self, data_folder=None, datos_formulario=None, ventana_anterior=None, ruta_csv_filtrado=None, ventana_subir=None):
         super().__init__()
         self.data_folder = data_folder or ""
         self.datos_formulario = datos_formulario or {}
         self.ventana_anterior = ventana_anterior
+        self.ventana_subir = ventana_subir
         self.ruta_csv_filtrado = ruta_csv_filtrado  # CSV generado con datos filtrados
         self.imagenes_estrellas = []  # Lista de imágenes encontradas
         self.imagen_actual_index = 0  # Índice de imagen actual mostrada
@@ -373,6 +374,9 @@ class DatosF(QMainWindow):
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setMinimumHeight(300)
+        # Eliminar el efecto 3D del marco del scroll area
+        self.scroll_area.setFrameShape(QFrame.NoFrame)
+        self.scroll_area.setFrameShadow(QFrame.Plain)
         
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignCenter)
@@ -633,7 +637,7 @@ class DatosF(QMainWindow):
         """Crea un separador horizontal personalizado"""
         separator = QFrame()
         separator.setFrameShape(QFrame.HLine)
-        separator.setFrameShadow(QFrame.Sunken)
+        separator.setFrameShadow(QFrame.Plain)
         separator.setStyleSheet(StyleSheets.SEPARATOR)
         return separator
 
@@ -641,7 +645,7 @@ class DatosF(QMainWindow):
         """Crea un separador vertical personalizado"""
         separator = QFrame()
         separator.setFrameShape(QFrame.VLine)
-        separator.setFrameShadow(QFrame.Sunken)
+        separator.setFrameShadow(QFrame.Plain)
         separator.setStyleSheet(StyleSheets.SEPARATOR)
         separator.setMaximumWidth(2)
         return separator
@@ -1271,9 +1275,11 @@ class DatosF(QMainWindow):
                 pass
             
     def nuevo_analisis(self):
-        """Vuelve a la ventana anterior para realizar un nuevo análisis"""
-        if self.ventana_anterior:
-            self.ventana_anterior.show()
+        """Vuelve a la ventana 'Subir Archivos' para realizar un nuevo análisis"""
+        if self.ventana_subir:
+            self.ventana_subir.show()
+            self.ventana_subir.raise_()
+            self.ventana_subir.activateWindow()
         self.close()
 
 if __name__ == '__main__':

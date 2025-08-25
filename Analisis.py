@@ -249,7 +249,8 @@ class VentanaProgreso(QDialog):
             data_folder=datos['data_folder'],
             datos_formulario=datos['datos_formulario'],
             ventana_anterior=None,
-            ruta_csv_filtrado=datos.get('ruta_csv', None)
+            ruta_csv_filtrado=datos.get('ruta_csv', None),
+            ventana_subir=datos.get('ventana_subir', None)
         )
         
         ventana_resultados.show()
@@ -808,7 +809,7 @@ def obtener_datos_filtrados(table_main, table_descartadas):
     print(f"Datos filtrados: {len(datos_filtrados)} estrellas (de {table_main.rowCount()} originales)")
     return datos_filtrados
 
-def realizar_analisis_completo(table_main, table_descartadas, datos_formulario, periodo_max=3, periodo_min=0.01):
+def realizar_analisis_completo(table_main, table_descartadas, datos_formulario, periodo_max=3, periodo_min=0.01, ventana_subir=None):
     """Método principal para realizar el análisis completo con los datos filtrados"""
     try:
         print("=== INICIANDO ANÁLISIS ===")
@@ -861,7 +862,8 @@ def realizar_analisis_completo(table_main, table_descartadas, datos_formulario, 
                 ventana_progreso.datos_para_datosf = {
                     'data_folder': worker.data_folder_final,
                     'datos_formulario': datos_formulario,
-                    'ruta_csv': getattr(worker, 'ruta_csv_generado', None)
+                    'ruta_csv': getattr(worker, 'ruta_csv_generado', None),
+                    'ventana_subir': ventana_subir
                 }
                 print("Información guardada para abrir DatosF al cerrar la ventana.")
             else:
