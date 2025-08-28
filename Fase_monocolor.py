@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib.pylab as plt
 
-dataV= np.loadtxt('ngc6397/data4/star4/V18V')
-dataI= np.loadtxt('ngc6397/data4/star4/V18I') #loadtxt
+dataV= np.loadtxt('C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion/lc_v/0498.561_0358.881V')
+dataI= np.loadtxt('C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion/lc_i/0497.646_0358.680I')
 
 timeVfull = dataV[:,0]
 fluxVfull = dataV[:,1]
@@ -12,7 +12,7 @@ fluxIfull = dataI[:,1]
 
 #---------------------------------------------------------------------
         
-PerStar=0.252390807220625
+PerStar=0.0389613464230802
 
 LentimeV= len(timeVfull)
 FaseV=[]
@@ -58,5 +58,5 @@ plt.ylabel('$I$', fontsize=12)
 plt.xlabel('$\phi$', fontsize=12)
 
 plt.subplots_adjust(hspace=0)
-plt.savefig('faseos/S8-V2.pdf')
+#plt.savefig('faseos/S8-V2.pdf')
 plt.show()
