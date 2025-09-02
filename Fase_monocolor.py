@@ -1,62 +1,113 @@
 import numpy as np
 import matplotlib.pylab as plt
+import os
 
-dataV= np.loadtxt('C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion/lc_v/0498.561_0358.881V')
-dataI= np.loadtxt('C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion/lc_i/0497.646_0358.680I')
+class FaseMonocolor:
+    def __init__(self):
+        self.timeVfull = []
+        self.timeIfull = []
+        self.fluxVfull = []
+        self.fluxIfull = []
+        self.FaseV = []
+        self.FaseVmas = []
+        self.FaseI = []
+        self.FaseImas = []
 
-timeVfull = dataV[:,0]
-fluxVfull = dataV[:,1]
+    def cargar_datos(self, star_data, PerStar):
+        data_folder, star_name = star_data
 
-timeIfull = dataI[:,0]
-fluxIfull = dataI[:,1]
-
-#---------------------------------------------------------------------
+        # El directorio específico de la estrella está dentro del directorio principal
+        route = os.path.join(data_folder, star_name)
         
-PerStar=0.0389613464230802
+        if not os.path.exists(route):
+            return {
+                'star': star_name,
+                'status': 'error',
+                'message': f'Directorio no encontrado: {route}',
+                'time': 0
+            }
+        
+        files = os.listdir(route)
 
-LentimeV= len(timeVfull)
-FaseV=[]
-FaseVmas=[]
+        fileV = next((f for f in files if f.endswith('V')), None)
+        fileI = next((f for f in files if f.endswith('i')), None)
 
-for i in range(LentimeV):
-    FaseoV = (abs( (timeVfull[i]/PerStar)-0.8) - abs( int ( (timeVfull[i]/PerStar)-0.8) ))
-    FaseoVMas = FaseoV+1.0
-    FaseV.append(FaseoV)
-    FaseVmas.append(FaseoVMas)
+        if not (fileV and fileI):
+            return {
+                'star': star_name,
+                'status': 'error',
+                'message': f'Archivos faltantes: V={fileV}, I={fileI}',
+                'time': 0
+            }
+        
+        dataV= np.loadtxt(os.path.join(route, fileV))
+        dataI= np.loadtxt(os.path.join(route, fileI))
 
+        self.timeVfull = dataV[:,0]
+        self.fluxVfull = dataV[:,1]
 
-LentimeI= len(timeIfull)
-FaseI=[]
-FaseImas=[]
+        self.timeIfull = dataI[:,0]
+        self.fluxIfull = dataI[:,1]
 
-for i in range(LentimeI):
-    FaseoI = (abs( (timeIfull[i]/PerStar)-0.8) - abs( int ( (timeIfull[i]/PerStar)-0.8) ))
-    FaseoIMas = FaseoI+1.0
-    FaseI.append(FaseoI)
-    FaseImas.append(FaseoIMas)
+        #---------------------------------------------------------------------
 
+        LentimeV= len(self.timeVfull)
 
-#---------------------------------------------------------------------
-plt.subplot(2,1,1)
+        for i in range(LentimeV):
+            FaseoV = (abs( (self.timeVfull[i]/PerStar)-0.8) - abs( int ( (self.timeVfull[i]/PerStar)-0.8) ))
+            FaseoVMas = FaseoV+1.0
+            self.FaseV.append(FaseoV)
+            self.FaseVmas.append(FaseoVMas)
 
-plt.plot(FaseV, fluxVfull, 'g.')
-plt.plot(FaseVmas, fluxVfull, 'g.')
-plt.xlim(-0.02,2.02)
-plt.title('Star 8| $P=$%.6f' %PerStar)
-plt.ylim(plt.ylim()[::-1])
-plt.xticks(fontsize=2)
-plt.ylabel('$V$',fontsize=12)
+        LentimeI= len(self.timeIfull)
 
-#---------------------------------------------------------------------
-plt.subplot(2,1,2)
+        for i in range(LentimeI):
+            FaseoI = (abs( (self.timeIfull[i]/PerStar)-0.8) - abs( int ( (self.timeIfull[i]/PerStar)-0.8) ))
+            FaseoIMas = FaseoI+1.0
+            self.FaseI.append(FaseoI)
+            self.FaseImas.append(FaseoIMas)
 
-plt.plot(FaseI, fluxIfull, 'r.')
-plt.plot(FaseImas, fluxIfull, 'r.')
-plt.xlim(-0.02,2.02)
-plt.ylim(plt.ylim()[::-1])
-plt.ylabel('$I$', fontsize=12)
-plt.xlabel('$\phi$', fontsize=12)
+        self.generar_plot(route, star_name, PerStar)
+        
+        # Retornar éxito
+        return {
+            'star': star_name,
+            'status': 'success',
+            'message': 'Curva de luz generada exitosamente',
+            'time': len(self.timeVfull) + len(self.timeIfull)
+        }
 
-plt.subplots_adjust(hspace=0)
-#plt.savefig('faseos/S8-V2.pdf')
-plt.show()
+    def generar_plot(self, route, star_name, PerStar):
+        try:
+            # Crear una nueva figura explícitamente
+            fig = plt.figure(figsize=(10, 8))
+            
+            plt.subplot(2,1,1)
+            plt.plot(self.FaseV, self.fluxVfull, 'g.')
+            plt.plot(self.FaseVmas, self.fluxVfull, 'g.')
+            plt.xlim(-0.02,2.02)
+            plt.title(f'{star_name} | $P=$%.6f' % PerStar)
+            plt.ylim(plt.ylim()[::-1])
+            plt.xticks(fontsize=2)
+            plt.ylabel('$V$',fontsize=12)
+
+            #---------------------------------------------------------------------
+            plt.subplot(2,1,2)
+            plt.plot(self.FaseI, self.fluxIfull, 'r.')
+            plt.plot(self.FaseImas, self.fluxIfull, 'r.')
+            plt.xlim(-0.02,2.02)
+            plt.ylim(plt.ylim()[::-1])
+            plt.ylabel('$I$', fontsize=12)
+            plt.xlabel(r'$\phi$', fontsize=12)
+            plt.subplots_adjust(hspace=0)
+            plot_path = os.path.join(route, f'light_curve_{star_name}.png')
+            plt.savefig(plot_path, dpi=150, bbox_inches='tight')
+            plt.close(fig)  # Cerrar la figura específica
+            
+        except Exception as e:
+            print(f"ERROR en generar_plot: {e}")
+            import traceback
+            traceback.print_exc()
+
+if __name__ == "__main__":
+    pass

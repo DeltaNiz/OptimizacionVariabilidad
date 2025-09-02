@@ -14,6 +14,7 @@ import sys
 import argparse
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
+import Fase_monocolor
 #import psutil
 import traceback
 
@@ -113,7 +114,10 @@ def process_single_star(star_data, Pend=3, Pbeg=0.01):
         freqsglsi = (clpI.freq[peaksglsi])[sortglsi]
         freqspdmv = (f1[peakspdmv])[sortpdmv]
         freqspdmi = (f2[peakspdmi])[sortpdmi]
-        
+
+        fase_monocolor = Fase_monocolor.FaseMonocolor()
+        fase_monocolor.cargar_datos(star_data, 1./clp.freq[np.argmax(clp.power)]) # Generador de curvas de luz
+
         # Guardar CSVs
         pd.DataFrame({'freq': freqsglsv, 'period': 1./freqsglsv}).to_csv(
             os.path.join(route, 'pglsv.csv'), index=False)
