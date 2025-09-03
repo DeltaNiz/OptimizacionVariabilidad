@@ -80,7 +80,7 @@ class FaseMonocolor:
     def generar_plot(self, route, star_name, PerStar):
         try:
             # Crear una nueva figura explícitamente
-            fig = plt.figure(figsize=(10, 8))
+            fig = plt.figure(figsize=(12, 8))
             
             plt.subplot(2,1,1)
             plt.plot(self.FaseV, self.fluxVfull, 'g.')
@@ -101,7 +101,7 @@ class FaseMonocolor:
             plt.xlabel(r'$\phi$', fontsize=12)
             plt.subplots_adjust(hspace=0)
             plot_path = os.path.join(route, f'light_curve_{star_name}.png')
-            plt.savefig(plot_path, dpi=150, bbox_inches='tight')
+            plt.savefig(plot_path, bbox_inches='tight')
             plt.close(fig)  # Cerrar la figura específica
             
         except Exception as e:

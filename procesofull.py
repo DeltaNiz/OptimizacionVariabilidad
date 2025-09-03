@@ -207,7 +207,7 @@ def generate_plots(clp, clpI, f1, t1, f2, t2, route):
         ax[1,1].legend()
         
         plt.subplots_adjust(hspace=0)
-        plt.savefig(os.path.join(route, 'GLSPDM.png'))
+        plt.savefig(os.path.join(route, 'GLSPDM.png'), bbox_inches='tight')
         plt.close()
         
     except Exception as e:

@@ -18,15 +18,15 @@ class AppConstants:
     # Dimensiones de celdas
     ANCHO_CELDA_DEFAULT = 119
     ANCHO_CELDA_PRIMERA = 48
-    ANCHO_CELDA_SCREEN_1920 = 117
-    ANCHO_CELDA_PRIMERA_1920 = 49
+    ANCHO_CELDA_SCREEN_1920 = 120
+    ANCHO_CELDA_PRIMERA_1920 = 47
     
     # Breakpoints de pantalla
     SCREEN_SMALL = 1366
     SCREEN_MEDIUM = 1920
     
     # Tamaños de ventana
-    WINDOW_MEDIUM = (1350, 950)
+    WINDOW_MEDIUM = (1375, 975)
     WINDOW_LARGE = (1600, 1000)
     
     # Headers de tabla
@@ -177,7 +177,7 @@ class StyleSheets:
         QLabel {
             border: 2px solid #a7c942;
             border-radius: 5px;
-            background-color: #f9f9f9;
+            background-color: white;
             padding: 10px;
         }
     """
@@ -192,8 +192,11 @@ class DatosF(QMainWindow):
         self.ventana_anterior = ventana_anterior
         self.ventana_subir = ventana_subir
         self.ruta_csv_filtrado = ruta_csv_filtrado  # CSV generado con datos filtrados
-        self.imagenes_estrellas = []  # Lista de imágenes encontradas
+        self.imagenes_estrellas = []  # Lista de imágenes encontradas (tipo actual)
+        self.imagenes_periodograma = []  # Lista de imágenes de periodograma
+        self.imagenes_curva_luz = []  # Lista de imágenes de curva de luz
         self.imagen_actual_index = 0  # Índice de imagen actual mostrada
+        self.tipo_imagen_actual = 'periodograma'  # Tipo de imagen actual
         
         # Configuración centralizada usando constantes
         self.imagen_ancho_fijo = AppConstants.IMAGEN_ANCHO_FIJO
@@ -264,8 +267,8 @@ class DatosF(QMainWindow):
             
             # Calcular posición central con offset en altura
             x = (screen_geometry.width() - self.width()) // 2
-            y = (screen_geometry.height() - self.height()) // 2 - 50  # Offset de 50px hacia arriba
-            
+            y = (screen_geometry.height() - self.height()) // 2 - 38  # Offset de 38px hacia arriba
+
             # Posicionar la ventana en el centro
             self.move(max(0, x), max(0, y))
             print(f"Ventana DatosF centrada en posición ({x}, {y}) con offset")
@@ -351,7 +354,12 @@ class DatosF(QMainWindow):
         right_layout.addWidget(label_subtitle)
         right_layout.addSpacing(8)
         right_layout.addWidget(self._create_horizontal_separator())
-        right_layout.addSpacing(10)
+        right_layout.addSpacing(5)
+        
+        # Agregar selector de tipo de imagen alineado a la derecha
+        tipo_imagen_layout = self._create_image_type_selector()
+        right_layout.addLayout(tipo_imagen_layout)
+        right_layout.addSpacing(5)
 
         # Configurar área de imágenes
         self._setup_image_area(right_layout)
@@ -377,6 +385,14 @@ class DatosF(QMainWindow):
         # Eliminar el efecto 3D del marco del scroll area
         self.scroll_area.setFrameShape(QFrame.NoFrame)
         self.scroll_area.setFrameShadow(QFrame.Plain)
+        # Establecer fondo blanco para el área de scroll
+        self.scroll_area.setStyleSheet("""
+            QScrollArea {
+                background-color: white;
+                border: 1px solid #a7c942;
+                border-radius: 5px;
+            }
+        """)
         
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignCenter)
@@ -412,6 +428,37 @@ class DatosF(QMainWindow):
         navegacion_layout.addWidget(self.btn_siguiente)
         
         return navegacion_layout
+
+    def _create_image_type_selector(self):
+        """Crea el selector de tipo de imagen alineado a la derecha"""
+        container_layout = QHBoxLayout()
+        
+        # Agregar stretch a la izquierda para empujar el selector a la derecha
+        container_layout.addStretch()
+        
+        # Controles de tipo de imagen
+        tipo_imagen_layout = QHBoxLayout()
+        tipo_label = QLabel("Tipo de imagen:")
+        tipo_label.setStyleSheet("font-size: 10px; color: #666; margin-right: 8px;")
+        tipo_label.setAlignment(Qt.AlignCenter)
+        
+        self.btn_periodograma = self._create_image_type_button("Periodograma", True)
+        self.btn_curva_luz = self._create_image_type_button("Curva de Luz", False)
+        
+        self.btn_periodograma.clicked.connect(lambda: self.cambiar_tipo_imagen('periodograma'))
+        self.btn_curva_luz.clicked.connect(lambda: self.cambiar_tipo_imagen('curva_luz'))
+        
+        tipo_imagen_layout.addWidget(tipo_label)
+        tipo_imagen_layout.addWidget(self.btn_periodograma)
+        tipo_imagen_layout.addWidget(self.btn_curva_luz)
+        tipo_imagen_layout.setSpacing(5)
+        
+        container_layout.addLayout(tipo_imagen_layout)
+        
+        # Inicializar el tipo de imagen actual
+        self.tipo_imagen_actual = 'periodograma'
+        
+        return container_layout
 
     def _create_logs_area(self):
         """Crea el área de logs para mostrar datos de análisis"""
@@ -597,6 +644,46 @@ class DatosF(QMainWindow):
         button.setCursor(QCursor(Qt.PointingHandCursor))
         button.setStyleSheet(StyleSheets.BUTTON_NAVIGATION)
         button.clicked.connect(callback)
+        return button
+
+    def _create_image_type_button(self, text, is_active=False):
+        """Crea un botón para cambiar el tipo de imagen"""
+        button = QPushButton(text)
+        button.setMaximumWidth(120)
+        button.setCursor(QCursor(Qt.PointingHandCursor))
+        
+        # Estilo para botón activo/inactivo
+        if is_active:
+            button.setStyleSheet("""
+                QPushButton {
+                    font-size: 10px;
+                    color: white;
+                    font-weight: bold;
+                    border: none;
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    background-color: #a7c942;
+                }
+                QPushButton:hover {
+                    background-color: #98b83b;
+                }
+            """)
+        else:
+            button.setStyleSheet("""
+                QPushButton {
+                    font-size: 10px;
+                    color: #666;
+                    font-weight: bold;
+                    border: 1px solid #ccc;
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    background-color: #f5f5f5;
+                }
+                QPushButton:hover {
+                    background-color: #e5e5e5;
+                }
+            """)
+        
         return button
 
     def _setup_action_buttons(self, layout):
@@ -1103,8 +1190,9 @@ class DatosF(QMainWindow):
             # self.mostrar_datos_ejemplo()
 
     def cargar_imagenes_estrellas(self):
-        """Carga las imágenes generadas por procesofull.py desde las carpetas de estrellas de manera optimizada"""
-        self.imagenes_estrellas = []
+        """Carga las imágenes generadas por procesofull.py y Fase_monocolor.py desde las carpetas de estrellas de manera optimizada"""
+        self.imagenes_periodograma = []
+        self.imagenes_curva_luz = []
         
         if not self._validar_carpeta_analisis():
             return
@@ -1114,7 +1202,7 @@ class DatosF(QMainWindow):
         
         # Buscar imágenes de manera eficiente
         try:
-            self.imagenes_estrellas = self._buscar_imagenes_en_carpetas_estrellas()
+            self._buscar_imagenes_en_carpetas_estrellas()
             self._configurar_visualizacion_imagenes()
         except Exception as e:
             print(f"Error al cargar imágenes de estrellas: {e}")
@@ -1129,36 +1217,38 @@ class DatosF(QMainWindow):
 
     def _buscar_imagenes_en_carpetas_estrellas(self):
         """Busca imágenes en carpetas de estrellas de manera optimizada"""
-        imagenes = []
         try:
             with os.scandir(self.data_folder) as entries:
                 for entry in entries:
                     if entry.is_dir() and entry.name.startswith('star'):
-                        imagenes_carpeta = self._buscar_imagenes_en_carpeta(entry)
-                        imagenes.extend(imagenes_carpeta)
+                        self._buscar_imagenes_en_carpeta(entry)
         except Exception as e:
             print(f"Error al buscar imágenes en carpetas: {e}")
-        return imagenes
 
     def _buscar_imagenes_en_carpeta(self, carpeta_entry):
         """Busca imágenes en una carpeta específica de estrella"""
-        imagenes = []
         try:
+            numero_estrella = carpeta_entry.name.replace('star', '')
+            
             with os.scandir(carpeta_entry.path) as archivos:
                 for archivo in archivos:
                     if archivo.is_file() and self._es_archivo_imagen(archivo.name):
-                        # Extraer número de estrella del nombre de la carpeta
-                        numero_estrella = carpeta_entry.name.replace('star', '')
-                        
-                        imagenes.append({
+                        imagen_info = {
                             'ruta': archivo.path,
                             'estrella': numero_estrella,
                             'nombre': archivo.name,
                             'carpeta': carpeta_entry.name
-                        })
+                        }
+                        
+                        # Clasificar según el tipo de imagen
+                        if 'light_curve' in archivo.name.lower():
+                            self.imagenes_curva_luz.append(imagen_info)
+                        else:
+                            # Por defecto, las imágenes sin prefijo específico son periodogramas
+                            self.imagenes_periodograma.append(imagen_info)
+                            
         except Exception as e:
             print(f"Error al buscar imágenes en {carpeta_entry.name}: {e}")
-        return imagenes
 
     def _es_archivo_imagen(self, nombre_archivo):
         """Verifica si un archivo es una imagen válida"""
@@ -1166,15 +1256,20 @@ class DatosF(QMainWindow):
 
     def _configurar_visualizacion_imagenes(self):
         """Configura la visualización inicial de imágenes"""
+        # Ordenar imágenes por número de estrella
+        self.imagenes_periodograma.sort(key=lambda x: int(x['estrella']))
+        self.imagenes_curva_luz.sort(key=lambda x: int(x['estrella']))
+        
+        # Establecer el conjunto de imágenes actuales según el tipo seleccionado
+        self.imagenes_estrellas = self.imagenes_periodograma if self.tipo_imagen_actual == 'periodograma' else self.imagenes_curva_luz
+        
         if self.imagenes_estrellas:
-            # Ordenar imágenes por número de estrella
-            self.imagenes_estrellas.sort(key=lambda x: int(x['estrella']))
-            print(f"Encontradas {len(self.imagenes_estrellas)} imágenes de estrellas")
+            print(f"Encontradas {len(self.imagenes_periodograma)} imágenes de periodograma y {len(self.imagenes_curva_luz)} imágenes de curva de luz")
             self.imagen_actual_index = 0
             self.mostrar_imagen_actual()
             self.actualizar_controles_navegacion()
         else:
-            print("No se encontraron imágenes")
+            print("No se encontraron imágenes del tipo seleccionado")
             self._mostrar_mensaje_sin_imagenes()
 
     def _mostrar_mensaje_sin_imagenes(self):
@@ -1273,6 +1368,88 @@ class DatosF(QMainWindow):
                 # Modo ejemplo
                 # self.mostrar_imagen_ejemplo()
                 pass
+            
+    def cambiar_tipo_imagen(self, tipo):
+        """Cambia entre tipos de imagen (periodograma/curva de luz)"""
+        if tipo == self.tipo_imagen_actual:
+            return
+        
+        # Guardar la estrella actual antes del cambio
+        estrella_actual = None
+        if self.imagenes_estrellas and self.imagen_actual_index < len(self.imagenes_estrellas):
+            estrella_actual = self.imagenes_estrellas[self.imagen_actual_index]['estrella']
+        
+        # Actualizar el tipo actual
+        self.tipo_imagen_actual = tipo
+        
+        # Actualizar estilos de botones
+        self._actualizar_estilos_botones_tipo()
+        
+        # Cambiar el conjunto de imágenes según el tipo
+        if tipo == 'periodograma':
+            self.imagenes_estrellas = self.imagenes_periodograma
+        else:  # curva_luz
+            self.imagenes_estrellas = self.imagenes_curva_luz
+        
+        # Intentar mantener la misma estrella
+        nuevo_indice = 0
+        if estrella_actual and self.imagenes_estrellas:
+            for i, imagen_info in enumerate(self.imagenes_estrellas):
+                if imagen_info['estrella'] == estrella_actual:
+                    nuevo_indice = i
+                    break
+        
+        # Establecer el índice y mostrar la imagen
+        if self.imagenes_estrellas:
+            self.imagen_actual_index = nuevo_indice
+            self.mostrar_imagen_actual()
+        else:
+            self._mostrar_mensaje_sin_imagenes()
+        
+        # Actualizar controles
+        self.actualizar_controles_navegacion()
+
+    def _actualizar_estilos_botones_tipo(self):
+        """Actualiza los estilos de los botones de tipo de imagen"""
+        # Estilo para botón activo
+        estilo_activo = """
+            QPushButton {
+                font-size: 10px;
+                color: white;
+                font-weight: bold;
+                border: none;
+                padding: 4px 8px;
+                border-radius: 4px;
+                background-color: #a7c942;
+            }
+            QPushButton:hover {
+                background-color: #98b83b;
+            }
+        """
+        
+        # Estilo para botón inactivo
+        estilo_inactivo = """
+            QPushButton {
+                font-size: 10px;
+                color: #666;
+                font-weight: bold;
+                border: 1px solid #ccc;
+                padding: 4px 8px;
+                border-radius: 4px;
+                background-color: #f5f5f5;
+            }
+            QPushButton:hover {
+                background-color: #e5e5e5;
+            }
+        """
+        
+        # Aplicar estilos según el tipo actual
+        if self.tipo_imagen_actual == 'periodograma':
+            self.btn_periodograma.setStyleSheet(estilo_activo)
+            self.btn_curva_luz.setStyleSheet(estilo_inactivo)
+        else:
+            self.btn_periodograma.setStyleSheet(estilo_inactivo)
+            self.btn_curva_luz.setStyleSheet(estilo_activo)
             
     def nuevo_analisis(self):
         """Vuelve a la ventana 'Subir Archivos' para realizar un nuevo análisis"""
