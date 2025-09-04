@@ -137,24 +137,6 @@ class StyleSheets:
         }}
     """
     
-    BUTTON_EXPORTAR = """
-        QPushButton {
-            font-size: 12px;
-            color: white;
-            font-weight: bold;
-            border: none;
-            padding: 5px 20px;
-            border-radius: 8px;
-            background-color: #a7c942;
-        }
-        QPushButton:hover {
-            background-color: #98b83b;
-        }
-        QPushButton:pressed {
-            background-color: #7a9530;
-        }
-    """
-    
     BUTTON_NUEVO_ANALISIS = """
         QPushButton {
             font-size: 12px;
@@ -640,7 +622,7 @@ class DatosF(QMainWindow):
         """Crea un botón de navegación con estilo consistente"""
         button = QPushButton(text)
         button.setEnabled(False)
-        button.setMaximumWidth(100)
+        button.setMaximumWidth(250)
         button.setCursor(QCursor(Qt.PointingHandCursor))
         button.setStyleSheet(StyleSheets.BUTTON_NAVIGATION)
         button.clicked.connect(callback)
@@ -688,12 +670,6 @@ class DatosF(QMainWindow):
 
     def _setup_action_buttons(self, layout):
         """Configura los botones de acción principales"""
-        btn_exportar = self._create_action_button(
-            "Exportar Resultados", 
-            StyleSheets.BUTTON_EXPORTAR, 
-            self.exportar_resultados
-        )
-        
         btn_nuevo_analisis = self._create_action_button(
             "Nuevo Análisis", 
             StyleSheets.BUTTON_NUEVO_ANALISIS, 
@@ -703,8 +679,6 @@ class DatosF(QMainWindow):
         # Layout para botones
         buttons_layout = QHBoxLayout()
         buttons_layout.addStretch()
-        buttons_layout.addWidget(btn_exportar)
-        buttons_layout.addSpacing(10)
         buttons_layout.addWidget(btn_nuevo_analisis)
         buttons_layout.addStretch()
         
@@ -715,7 +689,7 @@ class DatosF(QMainWindow):
         """Crea un botón de acción con estilo y configuración consistente"""
         button = QPushButton(text)
         button.setCursor(QCursor(Qt.PointingHandCursor))
-        button.setMaximumWidth(200)
+        button.setFixedWidth(180)  # Cambiado a tamaño fijo más grande
         button.setStyleSheet(style)
         button.clicked.connect(callback)
         return button
@@ -1042,58 +1016,6 @@ class DatosF(QMainWindow):
             info_texto += f"\nError al listar archivos: {e}"
         
         self.image_label.setText(info_texto)
-
-    def exportar_resultados(self):
-        """Exporta los resultados a un archivo de manera optimizada"""
-        try:
-            # Abrir diálogo para seleccionar ubicación
-            ruta_exportacion, _ = QFileDialog.getSaveFileName(
-                self,
-                "Exportar Resultados",
-                "resultados_analisis.csv",
-                "CSV files (*.csv);;All files (*.*)"
-            )
-            
-            if ruta_exportacion:
-                # Crear DataFrame optimizado directamente desde la tabla
-                datos = self._extraer_datos_tabla()
-                headers = self._extraer_headers_tabla()
-                
-                # Crear y guardar DataFrame
-                df = pd.DataFrame(datos, columns=headers)
-                df.to_csv(ruta_exportacion, index=False)
-                
-                QMessageBox.information(
-                    self,
-                    "Exportación Completada",
-                    f"Los resultados se han exportado exitosamente a:\n{ruta_exportacion}"
-                )
-                
-        except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Error de Exportación",
-                f"Error al exportar los resultados:\n{str(e)}"
-            )
-
-    def _extraer_datos_tabla(self):
-        """Extrae datos de la tabla de manera optimizada"""
-        datos = []
-        for row in range(self.table_main.rowCount()):
-            fila = []
-            for col in range(self.table_main.columnCount()):
-                item = self.table_main.item(row, col)
-                fila.append(item.text() if item else "")
-            datos.append(fila)
-        return datos
-
-    def _extraer_headers_tabla(self):
-        """Extrae headers de la tabla"""
-        headers = []
-        for col in range(self.table_main.columnCount()):
-            header_item = self.table_main.horizontalHeaderItem(col)
-            headers.append(header_item.text() if header_item else f"Col_{col+1}")
-        return headers
 
     def cargar_datos_csv_filtrado(self):
         """Carga los datos del CSV filtrado generado en la carpeta de análisis de manera optimizada"""
