@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QMainWindow, QApplication, QMessageBox, QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QTextEdit
+from PyQt5.QtWidgets import QApplication, QMessageBox, QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QTextEdit
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 import pandas as pd
 import sys
@@ -11,8 +11,96 @@ import re
 class AppConstants:
     """Clase centralizada para todas las constantes del proyecto"""
     
-    # Constantes del proyecto
-    RUTA_BASE_PROYECTO = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion'
+    # Configuración portable - rutas dinámicas según el usuario
+    @staticmethod
+    def get_base_project_path():
+        """Obtiene la ruta base del proyecto de forma portable"""
+        try:
+            # Usar la carpeta Documents del usuario actual
+            import os
+            from pathlib import Path
+            
+            # Obtener carpeta Documents del usuario (acceso rápido de Windows)
+            documents_path = Path.home() / "Documents"
+            
+            # Crear carpeta específica de la aplicación
+            app_folder = documents_path / "OptimizacionVariabilidad"
+            
+            # Crear carpetas necesarias si no existen
+            app_folder.mkdir(exist_ok=True)
+            (app_folder / "data").mkdir(exist_ok=True)
+            
+            return str(app_folder)
+            
+        except Exception as e:
+            # Fallback: usar directorio actual de la aplicación
+            import os
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            return current_dir
+    
+    # Ruta base del proyecto (se calculará dinámicamente)
+    RUTA_BASE_PROYECTO = get_base_project_path.__func__()
+    
+    # Modo debug (para desarrollo y diagnóstico)
+    DEBUG_MODE = False
+    
+    @staticmethod
+    def get_data_path():
+        """Obtiene la ruta para guardar análisis de datos de forma portable"""
+        from pathlib import Path
+        return str(Path(AppConstants.RUTA_BASE_PROYECTO) / "data")
+    
+    @staticmethod
+    def get_analysis_path(analysis_name=None):
+        """Obtiene la ruta para un análisis específico dentro de la carpeta data con estructura completa"""
+        from pathlib import Path
+        from datetime import datetime
+        
+        if analysis_name is None:
+            # Generar nombre basado en fecha y hora
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            analysis_name = f"Analisis_{timestamp}"
+        
+        # Los análisis se guardan dentro de la carpeta data
+        analysis_folder = Path(AppConstants.get_data_path()) / analysis_name
+        analysis_folder.mkdir(exist_ok=True)
+        
+        # Crear subcarpetas necesarias para el análisis
+        AppConstants._create_analysis_subfolders(analysis_folder)
+        
+        return str(analysis_folder)
+    
+    @staticmethod
+    def _create_analysis_subfolders(analysis_folder):
+        """Crea la estructura real de análisis según el formato esperado"""
+        from pathlib import Path
+        
+        analysis_path = Path(analysis_folder)
+        
+        # Solo crear la carpeta principal del análisis
+        # Los archivos CSV se guardan directamente en la raíz del análisis
+        # Las carpetas de estrellas las crea copiar.py
+        
+        """print(f"[FOLDER] Carpeta de analisis creada: {analysis_path}")
+        print("   |-- Best_Peak_GLS_Min_PDM.csv (se creara por procesofull.py)")
+        print("   |-- datos_filtrados_YYYYMMDD_HHMMSS.csv (se creara automaticamente)")
+        print("   |-- star1/ (se crean por copiar.py)")
+        print("   |-- star2/ (segun estrellas del CSV)")
+        print("   +-- starN/ (una por cada estrella del CSV)")
+        print("")"""
+    
+    @staticmethod
+    def get_best_peak_file_path(analysis_path):
+        """Obtiene la ruta del archivo Best_Peak_GLS_Min_PDM.csv"""
+        from pathlib import Path
+        return str(Path(analysis_path) / "Best_Peak_GLS_Min_PDM.csv")
+     
+    @staticmethod
+    def create_analysis_timestamp():
+        """Crea un timestamp para nombres de análisis y archivos"""
+        from datetime import datetime
+        return datetime.now().strftime("%Y%m%d_%H%M%S")
+    
     COLUMNAS_CSV = ['V', 'I', 'MV', 'MI']
     EXTENSIONES_ARCHIVOS = {
         'csv': '.csv',
@@ -117,7 +205,7 @@ class VentanaProgreso(QDialog):
         
         if respuesta == QMessageBox.Yes:
             self.cancelado = True
-            self.label_estado.setText("🚫 CANCELANDO ANÁLISIS...")
+            self.label_estado.setText("[CANCEL] CANCELANDO ANALISIS...")
             self.label_progreso_estrellas.setText("Terminando procesos...")
             self.btn_cancelar.setEnabled(False)
             self.agregar_log("--- CANCELACIÓN SOLICITADA POR EL USUARIO ---")
@@ -386,10 +474,9 @@ class WorkerThread(QThread):
                 return
                 
             self.fase_analisis.emit("Preparando carpeta de análisis...", 20)
-            self.log_agregado.emit(f"Subcarpeta creada: data/{nombre_subcarpeta}")
             
-            # Construir ruta completa de la carpeta de datos
-            data_folder = os.path.join(AppConstants.RUTA_BASE_PROYECTO, 'data', nombre_subcarpeta)
+            # Construir ruta completa usando método portable
+            data_folder = AppConstants.get_analysis_path(nombre_subcarpeta)
             
             # Guardar la ruta para usar después del análisis y para limpieza en caso de cancelación
             self.data_folder_final = data_folder
@@ -512,15 +599,34 @@ class WorkerThread(QThread):
                 return False, ""
             
             # Generar nombre único para la subcarpeta del análisis
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = AppConstants.create_analysis_timestamp()
             nombre_subcarpeta = f"analisis_{timestamp}"
             
-            # Ejecutar copiar.py con parámetros
-            self.proceso_actual = subprocess.run([
+            # Ejecutar copiar.py con parámetros portables
+            cmd = [
                 sys.executable, ruta_copiar,
                 '--csv', ruta_csv,
                 '--subcarpeta', nombre_subcarpeta
-            ], capture_output=True, text=True)
+            ]
+            
+            # Obtener rutas de carpetas desde datos_formulario (seleccionadas por el usuario)
+            lc_i_path = None
+            lc_v_path = None
+            
+            if self.datos_formulario and 'carpeta_filtro_I' in self.datos_formulario:
+                lc_i_path = self.datos_formulario['carpeta_filtro_I']
+                
+            if self.datos_formulario and 'carpeta_filtro_V' in self.datos_formulario:
+                lc_v_path = self.datos_formulario['carpeta_filtro_V']
+                
+            # Agregar rutas de carpetas si están disponibles
+            if lc_i_path and lc_v_path:
+                cmd.extend(['--lc_i', lc_i_path, '--lc_v', lc_v_path])
+            else:
+                self.log_agregado.emit("[WARNING] No se encontraron rutas de carpetas I/V en datos del formulario")
+                self.log_agregado.emit("[INFO] copiar.py buscará carpetas automáticamente")
+            
+            self.proceso_actual = subprocess.run(cmd, capture_output=True, text=True)
             
             if self.ventana_progreso.cancelado:
                 return False, ""
@@ -528,12 +634,17 @@ class WorkerThread(QThread):
             if self.proceso_actual.returncode == 0:
                 self.log_agregado.emit("Archivos copiados correctamente")
                 if self.proceso_actual.stdout:
-                    self.log_agregado.emit(self.proceso_actual.stdout.strip())
+                    # Mostrar salida línea por línea para mejor legibilidad
+                    for line in self.proceso_actual.stdout.strip().split('\n'):
+                        if line.strip():
+                            self.log_agregado.emit(line.strip())
                 return True, nombre_subcarpeta
             else:
                 self.log_agregado.emit("ERROR al ejecutar copiar.py")
                 if self.proceso_actual.stderr:
                     self.log_agregado.emit(f"Error: {self.proceso_actual.stderr}")
+                if self.proceso_actual.stdout:
+                    self.log_agregado.emit(f"Output: {self.proceso_actual.stdout}")
                 return False, ""
                 
         except Exception as e:
@@ -555,10 +666,15 @@ class WorkerThread(QThread):
 
             self.log_agregado.emit(f"<b>Iniciando análisis con período: máx={self.periodo_max}, mín={self.periodo_min}</b>")
 
-            # Ejecutar procesofull.py con parámetros de período y mostrar output en tiempo real
+            # Ejecutar procesofull.py con parámetros portables
+            # Extraer nombre del análisis desde data_folder para modo portable
+            from pathlib import Path
+            data_path = Path(data_folder)
+            analysis_name = data_path.name  # ej: analisis_20250915_141459
+            
             self.proceso_actual = subprocess.Popen([
                 sys.executable, '-u', ruta_procesofull,  # -u para unbuffered output
-                '--data_folder', data_folder,
+                '--analisis', analysis_name,  # Usar modo portable
                 '--pend', str(self.periodo_max),
                 '--pbeg', str(self.periodo_min)
             ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=0, universal_newlines=True)
@@ -668,15 +784,15 @@ class WorkerThread(QThread):
                             self.log_agregado.emit(f"[ERROR] Error parseando progreso de estrella: {e}")
                     
                     # Detectar errores en estrellas (incrementar contador también)
-                    elif "✗ Error en estrella" in linea:
+                    elif "[ERROR] Error en estrella" in linea:
                         try:
                             match = AppConstants.REGEX_PATTERNS['estrella_error'].search(linea)
                             if match:
                                 estrella_nombre = match.group(1)
-                                self.detalle_cambiado.emit(f"✗ Error en {estrella_nombre}")
+                                self.detalle_cambiado.emit(f"[ERROR] Error en {estrella_nombre}")
                             else:
                                 # Fallback sin regex
-                                self.detalle_cambiado.emit("✗ Error en procesamiento de estrella")
+                                self.detalle_cambiado.emit("[ERROR] Error en procesamiento de estrella")
                             
                             # Incrementar contador local (estrella fallida también cuenta como procesada)
                             estrellas_procesadas += 1
@@ -740,33 +856,6 @@ class WorkerThread(QThread):
         except Exception as e:
             self.log_agregado.emit(f"<b>ERROR al ejecutar procesofull.py: {e}</b>")
             return False
-
-class Analisis(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.init_ui()
-
-    def init_ui(self):
-        # Obtener información de la pantalla
-        screen_geometry = QApplication.desktop().screenGeometry()
-        screen_width = screen_geometry.width()
-        screen_height = screen_geometry.height()
-        
-        print(f"Resolución de pantalla: {screen_width}x{screen_height}")
-        
-        # Lógica similar a media queries
-        if screen_width <= 1366:  # Pantallas pequeñas/laptops
-            self.resize(600, 400)
-            self.setWindowTitle("Análisis - Pantalla Pequeña")
-            print(f"Configuración aplicada: Pantalla pequeña - Ventana: {self.width()}x{self.height()}")
-        elif screen_width <= 1920:  # Pantallas medianas/Full HD
-            self.resize(800, 600)
-            self.setWindowTitle("Análisis - Pantalla Mediana")
-            print(f"Configuración aplicada: Pantalla mediana - Ventana: {self.width()}x{self.height()}")
-        else:  # Pantallas grandes
-            self.resize(1000, 800)
-            self.setWindowTitle("Análisis - Pantalla Grande")
-            print(f"Configuración aplicada: Pantalla grande - Ventana: {self.width()}x{self.height()}")
 
 def obtener_datos_filtrados(table_main, table_descartadas):
     """Obtiene los datos de la tabla principal excluyendo las filas descartadas"""
@@ -1004,8 +1093,5 @@ if __name__ == "__main__":
         # Procesar el CSV
         procesar_csv_analisis(args.ruta_csv, parametros)
     else:
-        # Si se ejecuta normalmente, abrir la interfaz gráfica
-        app = QApplication(sys.argv)
-        window = Analisis()
-        window.show()
-        sys.exit(app.exec_())
+        # Si se ejecuta directamente, mostrar información portable
+        print("[INFO] Analisis.py ya no tiene interfaz gráfica propia.")

@@ -3,8 +3,8 @@ import numpy as np
 from numba import njit, prange
 import matplotlib.pylab as plt
 from PyAstronomy.pyTiming import pyPeriod
-from PyAstronomy.pyTiming import pyPDM
-from pdmpy import pdm
+#from PyAstronomy.pyTiming import pyPDM
+#from pdmpy import pdm
 import scipy.interpolate as sciinter
 import scipy.optimize as sciopti
 import os
@@ -17,6 +17,14 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import Fase_monocolor
 #import psutil
 import traceback
+from pathlib import Path
+
+# Importar la configuración portable
+try:
+    from Analisis import AppConstants
+    PORTABLE_MODE = True
+except ImportError:
+    PORTABLE_MODE = False
 
 def get_optimal_workers():
     """Detecta automáticamente el número óptimo de procesos paralelos"""
@@ -277,8 +285,10 @@ def main():
     script_start = t.time()
     
     # Configurar argumentos de línea de comandos
-    parser = argparse.ArgumentParser(description='Procesar análisis de estrellas en paralelo')
-    parser.add_argument('--data_folder', help='Ruta de la carpeta con los datos de las estrellas')
+    parser = argparse.ArgumentParser(description='Procesar análisis de estrellas en paralelo - Versión Portable')
+    parser.add_argument('--data_folder', help='Ruta específica de carpeta con datos (opcional en modo portable)')
+    parser.add_argument('--analisis', help='Nombre del análisis específico (ej: analisis_20250915_140322)')
+    parser.add_argument('--list', action='store_true', help='Mostrar análisis disponibles en modo portable')
     parser.add_argument('--workers', type=int, help='Número de procesos paralelos (auto-detecta si no se especifica)')
     parser.add_argument('--pend', type=float, default=3, help='Período máximo para análisis GLS (default: 3)')
     parser.add_argument('--pbeg', type=float, default=0.01, help='Período mínimo para análisis GLS (default: 0.01)')
@@ -297,13 +307,43 @@ def main():
         num_workers = get_optimal_workers()
         print(f"Auto-detectados {num_workers} workers óptimos")
     
-    # Determinar carpeta de datos
-    if args.data_folder:
-        data = args.data_folder
+    # Determinar carpeta de datos de manera portable
+    if PORTABLE_MODE:
+        
+        if args.data_folder:
+            # Usar carpeta específica si se proporciona
+            data = args.data_folder
+        elif args.analisis:
+            # Usar análisis específico por nombre
+            data = AppConstants.get_analysis_path(args.analisis)
+        else:
+            # Buscar el análisis más reciente automáticamente
+            base_data_path = AppConstants.get_base_project_path() / "data"
+            if base_data_path.exists():
+                # Buscar carpetas de análisis (formato: analisis_YYYYMMDD_HHMMSS)
+                analysis_folders = [d for d in base_data_path.iterdir() 
+                                 if d.is_dir() and d.name.startswith('analisis_')]
+                
+                if analysis_folders:
+                    # Ordenar por fecha de modificación, el más reciente primero
+                    latest_analysis = max(analysis_folders, key=lambda x: x.stat().st_mtime)
+                    data = str(latest_analysis)
+                    print(f"   -> Analisis mas reciente detectado: {latest_analysis.name}")
+                else:
+                    print("[ERROR] No se encontraron analisis en Documents/OptimizacionVariabilidad/data/")
+                    print("[INFO] Ejecuta primero copiar.py para crear la estructura de datos")
+                    return
+            else:
+                print("[ERROR] No existe la carpeta base Documents/OptimizacionVariabilidad/data/")
+                print("[INFO] Ejecuta primero copiar.py para crear la estructura")
+                return
     else:
-        data = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion/data/analisis_20250722_180246'
-
-    print(f"Carpeta de datos: {data}")
+        # Modo legado (rutas hardcoded)
+        print("[LEGACY] Usando rutas hardcoded (modo legado)")
+        if args.data_folder:
+            data = args.data_folder
+        else:
+            data = 'C:/Users/tomas/OneDrive/Escritorio/xd/U/2025-1/Formulacion de Proyecto de Titulacion/data/analisis_20250722_180246'
     
     if not os.path.exists(data):
         print(f"ERROR: No se encontró la carpeta de datos: {data}")
@@ -428,7 +468,14 @@ def main():
     # Guardar reporte detallado
     try:
         report_df = pd.DataFrame(results)
-        report_path = os.path.join(data, 'Best_Peak_GLS_Min_PDM.csv')
+        
+        if PORTABLE_MODE:
+            # Usar método portable para generar archivo de reporte
+            report_path = AppConstants.get_best_peak_file_path(data)
+        else:
+            # Método legado
+            report_path = os.path.join(data, 'Best_Peak_GLS_Min_PDM.csv')
+            
         report_df.to_csv(report_path, index=False)
         print(f"Reporte detallado guardado en: {report_path}")
     except Exception as e:
