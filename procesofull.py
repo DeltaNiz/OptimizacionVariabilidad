@@ -1,10 +1,8 @@
 from __future__ import print_function, division
 import numpy as np
 from numba import njit, prange
-import matplotlib.pylab as plt
+import matplotlib.pyplot as plt
 from PyAstronomy.pyTiming import pyPeriod
-#from PyAstronomy.pyTiming import pyPDM
-#from pdmpy import pdm
 import scipy.interpolate as sciinter
 import scipy.optimize as sciopti
 import os
@@ -15,7 +13,6 @@ import argparse
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import Fase_monocolor
-#import psutil
 import traceback
 from pathlib import Path
 
