@@ -7,11 +7,12 @@ hiddenimports = (
     collect_submodules('numpy') +
     collect_submodules('pandas') +
     collect_submodules('matplotlib') +
-    collect_submodules('astropy') +
+    collect_submodules('PyAstronomy') +
     collect_submodules('numba') +
     collect_submodules('multiprocessing') +
     collect_submodules('concurrent.futures') +
-    ['multiprocessing.spawn', 'multiprocessing.pool', 'multiprocessing.queues', 'multiprocessing.synchronize']
+    ['multiprocessing.spawn', 'multiprocessing.pool', 'multiprocessing.queues', 'multiprocessing.synchronize',
+     'PyAstronomy.pyTiming', 'PyAstronomy.pyTiming.pyPeriod', 'PyAstronomy.pyTiming.pyPDM']
 )
 
 a = Analysis([
@@ -22,7 +23,6 @@ a = Analysis([
     datas=[
         ('copiar.py', '.'),
         ('procesofull.py', '.'),
-        ('pyPeriod_astropy.py', '.'),
         ('Fase_monocolor.py', '.'),
         ('Analisis.py', '.'),
         ('Frontend/DatosF.py', 'Frontend/'),

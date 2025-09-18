@@ -2,7 +2,8 @@ from __future__ import print_function, division
 import numpy as np
 from numba import njit, prange
 import matplotlib.pyplot as plt
-from pyPeriod_astropy import Gls
+from PyAstronomy.pyTiming import pyPeriod
+#from pyPeriod_astropy import Gls
 import os
 import pandas as pd
 import time as t
@@ -98,9 +99,9 @@ def process_single_star(star_data, Pend=3, Pbeg=0.01):
         flux_i = dataI[:, 1]
         
         # Análisis GLS
-        clp = Gls((time_v, flux_v), norm="ZK", Pbeg=Pbeg, Pend=Pend)
-        clpI = Gls((time_i, flux_i), norm="ZK", Pbeg=Pbeg, Pend=Pend)
-        
+        clp = pyPeriod.Gls((time_v, flux_v), norm="ZK", Pbeg=Pbeg, Pend=Pend)  #Si se quiere cambiar el uso de pyAstronomy
+        clpI = pyPeriod.Gls((time_i, flux_i), norm="ZK", Pbeg=Pbeg, Pend=Pend) # a pyPeriod_astropy, descomentar las líneas
+                                                                               # de arriba y llamar a pyPeriod_astropy.Gls en su lugar.
         # Análisis PDM
         f1, t1 = pdm_with_covers_pypdm_like(
             time_v, flux_v, 
