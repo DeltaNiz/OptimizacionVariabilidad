@@ -626,25 +626,60 @@ class WorkerThread(QThread):
                 self.log_agregado.emit("[WARNING] No se encontraron rutas de carpetas I/V en datos del formulario")
                 self.log_agregado.emit("[INFO] copiar.py buscará carpetas automáticamente")
             
-            self.proceso_actual = subprocess.run(cmd, capture_output=True, text=True)
-            
-            if self.ventana_progreso.cancelado:
-                return False, ""
-            
-            if self.proceso_actual.returncode == 0:
-                self.log_agregado.emit("Archivos copiados correctamente")
-                if self.proceso_actual.stdout:
-                    # Mostrar salida línea por línea para mejor legibilidad
-                    for line in self.proceso_actual.stdout.strip().split('\n'):
-                        if line.strip():
-                            self.log_agregado.emit(line.strip())
-                return True, nombre_subcarpeta
-            else:
-                self.log_agregado.emit("ERROR al ejecutar copiar.py")
-                if self.proceso_actual.stderr:
-                    self.log_agregado.emit(f"Error: {self.proceso_actual.stderr}")
-                if self.proceso_actual.stdout:
-                    self.log_agregado.emit(f"Output: {self.proceso_actual.stdout}")
+            # Llamar directamente a copiar.py en lugar de usar subprocess
+            try:
+                import copiar
+                from io import StringIO
+                from contextlib import redirect_stdout, redirect_stderr
+                
+                # Simular sys.argv para copiar.py (solo los argumentos, no sys.executable ni ruta del script)
+                original_argv = sys.argv.copy()
+                # cmd = [sys.executable, ruta_copiar, '--csv', ruta_csv, '--subcarpeta', nombre_subcarpeta, ...]
+                # Necesitamos: ['copiar.py', '--csv', ruta_csv, '--subcarpeta', nombre_subcarpeta, ...]
+                sys.argv = ['copiar.py'] + cmd[2:]  # Saltar sys.executable y ruta_copiar
+                
+                # Capturar output
+                stdout_capture = StringIO()
+                stderr_capture = StringIO()
+                
+                with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                    try:
+                        copiar.main()
+                        resultado_exitoso = True
+                    except SystemExit as e:
+                        resultado_exitoso = (e.code == 0)
+                    except Exception as e:
+                        resultado_exitoso = False
+                        stderr_capture.write(f"Error: {e}")
+                
+                # Restaurar sys.argv
+                sys.argv = original_argv
+                
+                # Obtener output capturado
+                output = stdout_capture.getvalue()
+                error_output = stderr_capture.getvalue()
+                
+                if self.ventana_progreso.cancelado:
+                    return False, ""
+                
+                if resultado_exitoso:
+                    self.log_agregado.emit("Archivos copiados correctamente")
+                    if output:
+                        # Mostrar salida línea por línea para mejor legibilidad
+                        for line in output.strip().split('\n'):
+                            if line.strip():
+                                self.log_agregado.emit(line.strip())
+                    return True, nombre_subcarpeta
+                else:
+                    self.log_agregado.emit("ERROR al ejecutar copiar.py")
+                    if error_output:
+                        self.log_agregado.emit(f"Error: {error_output}")
+                    if output:
+                        self.log_agregado.emit(f"Output: {output}")
+                    return False, ""
+                    
+            except ImportError:
+                self.log_agregado.emit("ERROR: No se pudo importar copiar.py")
                 return False, ""
                 
         except Exception as e:
@@ -672,45 +707,56 @@ class WorkerThread(QThread):
             data_path = Path(data_folder)
             analysis_name = data_path.name  # ej: analisis_20250915_141459
             
-            self.proceso_actual = subprocess.Popen([
-                sys.executable, '-u', ruta_procesofull,  # -u para unbuffered output
-                '--analisis', analysis_name,  # Usar modo portable
-                '--pend', str(self.periodo_max),
-                '--pbeg', str(self.periodo_min)
-            ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=0, universal_newlines=True)
-            
-            total_estrellas = 0
-            estrellas_procesadas = 0
-            analisis_iniciado = False
-            
-            # Leer y mostrar output línea por línea en tiempo real
-            import platform
-            
-            while True:
-                # Verificar cancelación periódicamente
-                if self.ventana_progreso.cancelado or self.cancelacion_forzada:
-                    self.log_agregado.emit("Cancelación detectada, terminando proceso...")
-                    self._forzar_terminacion()  # Terminación inmediata
-                    return False
+            # Llamar directamente a procesofull.py en lugar de usar subprocess
+            try:
+                import procesofull
+                from io import StringIO
+                from contextlib import redirect_stdout, redirect_stderr
                 
-                # Leer línea con verificación de cancelación frecuente
-                try:
-                    output = self.proceso_actual.stdout.readline()
-                    if output == '' and self.proceso_actual.poll() is not None:
-                        break
-                except Exception as e:
-                    self.log_agregado.emit(f"Error leyendo output: {str(e)}")
-                    break
-                    
-                # Verificar cancelación después de cada línea leída
-                if self.ventana_progreso.cancelado or self.cancelacion_forzada:
-                    self.log_agregado.emit("Cancelación detectada durante lectura, terminando proceso...")
-                    self._forzar_terminacion()  # Terminación inmediata
-                    return False
-                    
-                if output:
-                    linea = output.strip()
-                    self.log_agregado.emit(linea)
+                # Simular sys.argv para procesofull.py
+                original_argv = sys.argv.copy()
+                sys.argv = [
+                    'procesofull.py',
+                    '--analisis', analysis_name,  # Usar modo portable
+                    '--pend', str(self.periodo_max),
+                    '--pbeg', str(self.periodo_min)
+                ]
+                
+                # Capturar output
+                stdout_capture = StringIO()
+                stderr_capture = StringIO()
+                
+                with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                    try:
+                        procesofull.main()
+                        resultado_exitoso = True
+                    except SystemExit as e:
+                        resultado_exitoso = (e.code == 0)
+                    except Exception as e:
+                        resultado_exitoso = False
+                        stderr_capture.write(f"Error: {e}")
+                
+                # Restaurar sys.argv
+                sys.argv = original_argv
+                
+                # Obtener output capturado
+                output = stdout_capture.getvalue()
+                error_output = stderr_capture.getvalue()
+            
+                # Procesar output línea por línea
+                total_estrellas = 0
+                estrellas_procesadas = 0
+                analisis_iniciado = False
+                
+                for line in output.strip().split('\n'):
+                    linea = line.strip()
+                    if linea:
+                        self.log_agregado.emit(linea)
+                        
+                        # Verificar cancelación periódicamente
+                        if self.ventana_progreso.cancelado or self.cancelacion_forzada:
+                            self.log_agregado.emit("Cancelación detectada...")
+                            return False
                     
                     # Detectar total de estrellas al inicio
                     if "Total de estrellas a procesar:" in linea:
@@ -841,16 +887,20 @@ class WorkerThread(QThread):
                             analisis_iniciado = True
                             self.detalle_cambiado.emit("Iniciando análisis de estrellas...")
             
-            rc = self.proceso_actual.poll()
-            
-            if self.ventana_progreso.cancelado:
-                return False
-            
-            if rc == 0:
-                self.log_agregado.emit("<b>Procesamiento completado</b>")
-                return True
-            else:
-                self.log_agregado.emit(f"<b>ERROR: Código de retorno: {rc}</b>")
+                if self.ventana_progreso.cancelado:
+                    return False
+                
+                if resultado_exitoso:
+                    self.log_agregado.emit("<b>Procesamiento completado</b>")
+                    return True
+                else:
+                    self.log_agregado.emit(f"<b>ERROR al ejecutar procesofull.py</b>")
+                    if error_output:
+                        self.log_agregado.emit(f"Error: {error_output}")
+                    return False
+                    
+            except ImportError:
+                self.log_agregado.emit("ERROR: No se pudo importar procesofull.py")
                 return False
                 
         except Exception as e:

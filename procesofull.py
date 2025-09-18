@@ -14,6 +14,25 @@ import Fase_monocolor
 import traceback
 from pathlib import Path
 
+# Configuración especial para PyInstaller y multiprocessing
+def configure_multiprocessing():
+    """Configurar multiprocessing para compatibilidad con PyInstaller"""
+    if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
+        # Estamos en un ejecutable empaquetado por PyInstaller
+        try:
+            mp.set_start_method('spawn', force=True)
+        except RuntimeError:
+            pass  # Ya configurado
+    else:
+        # Desarrollo normal
+        try:
+            mp.set_start_method('spawn', force=True)
+        except RuntimeError:
+            pass  # Ya configurado
+
+# Llamar la configuración al importar
+configure_multiprocessing()
+
 # Importar la configuración portable
 try:
     from Analisis import AppConstants
@@ -277,6 +296,9 @@ def pdm_with_covers_pypdm_like(time, flux, f_min, f_max, delf, nbin=10, ncovers=
     return freqs, thetas
 
 def main():
+    # Asegurar que multiprocessing esté configurado correctamente
+    configure_multiprocessing()
+    
     script_start = t.time()
     
     # Configurar argumentos de línea de comandos
@@ -486,4 +508,6 @@ def main():
             print(f"  ... y {len(failed_results) - 10} más")
 
 if __name__ == "__main__":
+    # Protección adicional para PyInstaller
+    mp.freeze_support()
     main()

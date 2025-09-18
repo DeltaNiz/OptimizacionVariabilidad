@@ -2,6 +2,15 @@ from PyQt5.QtWidgets import QApplication, QWidget, QDesktopWidget, QMainWindow, 
 from PyQt5.QtCore import Qt
 import SubirArchivos
 import sys
+import multiprocessing as mp
+
+# Configuración especial para PyInstaller y multiprocessing
+if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
+    # Estamos en un ejecutable empaquetado por PyInstaller
+    try:
+        mp.set_start_method('spawn', force=True)
+    except RuntimeError:
+        pass  # Ya configurado
 
 class Main(QMainWindow):
     def __init__(self):
@@ -160,6 +169,9 @@ class Main(QMainWindow):
         self.setFixedSize(self.fixed_width, self.fixed_height)
 
 if __name__ == "__main__":
+    # Protección para multiprocessing en PyInstaller
+    mp.freeze_support()
+    
     app = QApplication(sys.argv)
     window = Main()
     window.show()  # IMPORTANTE!!! LAS VENTANAS NO SE MUESTRAN HASTA QUE SE LLAME A show()
