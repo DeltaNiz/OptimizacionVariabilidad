@@ -687,7 +687,7 @@ class WorkerThread(QThread):
             return False, ""
     
     def ejecutar_procesofull_py(self, data_folder):
-        """Ejecuta procesofull.py automáticamente con la carpeta de datos generada y parámetros de período"""
+        """Ejecuta procesofull.py directamente con captura en tiempo real para la GUI"""
         try:
             if self.ventana_progreso.cancelado:
                 return False
@@ -701,64 +701,49 @@ class WorkerThread(QThread):
 
             self.log_agregado.emit(f"<b>Iniciando análisis con período: máx={self.periodo_max}, mín={self.periodo_min}</b>")
 
-            # Ejecutar procesofull.py con parámetros portables
             # Extraer nombre del análisis desde data_folder para modo portable
             from pathlib import Path
             data_path = Path(data_folder)
-            analysis_name = data_path.name  # ej: analisis_20250915_141459
+            analysis_name = data_path.name
             
-            # Llamar directamente a procesofull.py en lugar de usar subprocess
+            # Llamar directamente a procesofull.py
             try:
                 import procesofull
                 from io import StringIO
-                from contextlib import redirect_stdout, redirect_stderr
                 
-                # Simular sys.argv para procesofull.py
-                original_argv = sys.argv.copy()
-                sys.argv = [
-                    'procesofull.py',
-                    '--analisis', analysis_name,  # Usar modo portable
-                    '--pend', str(self.periodo_max),
-                    '--pbeg', str(self.periodo_min)
-                ]
+                # Clase para capturar output en tiempo real
+                class RealTimeOutputCapture:
+                    def __init__(self, gui_handler):
+                        self.gui_handler = gui_handler
+                        self.buffer = StringIO()
+                        
+                    def write(self, text):
+                        if text.strip():
+                            self.buffer.write(text)
+                            self.gui_handler(text.strip())
+                        return len(text)
+                        
+                    def flush(self):
+                        pass
+                        
+                    def getvalue(self):
+                        return self.buffer.getvalue()
                 
-                # Capturar output
-                stdout_capture = StringIO()
-                stderr_capture = StringIO()
-                
-                with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-                    try:
-                        procesofull.main()
-                        resultado_exitoso = True
-                    except SystemExit as e:
-                        resultado_exitoso = (e.code == 0)
-                    except Exception as e:
-                        resultado_exitoso = False
-                        stderr_capture.write(f"Error: {e}")
-                
-                # Restaurar sys.argv
-                sys.argv = original_argv
-                
-                # Obtener output capturado
-                output = stdout_capture.getvalue()
-                error_output = stderr_capture.getvalue()
-            
-                # Procesar output línea por línea
+                # Variables para progreso
                 total_estrellas = 0
                 estrellas_procesadas = 0
                 analisis_iniciado = False
                 
-                for line in output.strip().split('\n'):
-                    linea = line.strip()
-                    if linea:
-                        self.log_agregado.emit(linea)
-                        
-                        # Verificar cancelación periódicamente
-                        if self.ventana_progreso.cancelado or self.cancelacion_forzada:
-                            self.log_agregado.emit("Cancelación detectada...")
-                            return False
+                # Función para procesar cada línea de output en tiempo real
+                def process_output_line(linea):
+                    nonlocal total_estrellas, estrellas_procesadas, analisis_iniciado
                     
-                    # Detectar total de estrellas al inicio
+                    if self.ventana_progreso.cancelado or self.cancelacion_forzada:
+                        return
+                        
+                    self.log_agregado.emit(linea)
+                    
+                    # Detectar total de estrellas
                     if "Total de estrellas a procesar:" in linea:
                         try:
                             match = AppConstants.REGEX_PATTERNS['total_estrellas'].search(linea)
@@ -770,7 +755,7 @@ class WorkerThread(QThread):
                         except Exception as e:
                             self.log_agregado.emit(f"[ERROR] Error parseando total de estrellas: {e}")
                     
-                    # PRIORIDAD 1: Detectar progreso detallado con estadísticas (más confiable para paralelo)
+                    # Detectar progreso detallado
                     elif "Progreso:" in linea and "Exitosas:" in linea:
                         try:
                             match = AppConstants.REGEX_PATTERNS['progreso_detallado'].search(linea)
@@ -782,13 +767,11 @@ class WorkerThread(QThread):
                                     total_estrellas = total
                                     analisis_iniciado = True
                                 
-                                # Actualizar progreso con el número REAL de estrellas completadas
                                 self.progreso_estrellas.emit(actual, total)
-                                
                         except Exception as e:
                             self.log_agregado.emit(f"[ERROR] Error parseando progreso detallado: {e}")
                     
-                    # PRIORIDAD 2: Detectar estrella completada (incrementar contador local)
+                    # Detectar estrella completada
                     elif "[OK] Estrella" in linea and "completada exitosamente" in linea:
                         try:
                             match = AppConstants.REGEX_PATTERNS['estrella_completada'].search(linea)
@@ -796,40 +779,17 @@ class WorkerThread(QThread):
                                 estrella_nombre = match.group(1)
                                 tiempo = match.group(2)
                                 self.detalle_cambiado.emit(f"[OK] {estrella_nombre} completada en {tiempo}s")
-                                
-                                # Incrementar contador local de estrellas procesadas
-                                estrellas_procesadas += 1
-                                if total_estrellas > 0:
-                                    self.progreso_estrellas.emit(estrellas_procesadas, total_estrellas)
                             else:
-                                # Fallback sin regex - solo incrementar contador
-                                estrellas_procesadas += 1
-                                if total_estrellas > 0:
-                                    self.progreso_estrellas.emit(estrellas_procesadas, total_estrellas)
                                 self.detalle_cambiado.emit("[OK] Estrella completada exitosamente")
+                            
+                            estrellas_procesadas += 1
+                            if total_estrellas > 0:
+                                self.progreso_estrellas.emit(estrellas_procesadas, total_estrellas)
                                 
                         except Exception as e:
                             self.log_agregado.emit(f"[ERROR] Error parseando estrella completada: {e}")
                     
-                    # PRIORIDAD 3: Detectar progreso con formato "Procesando estrella X/Y" (solo para inicialización)
-                    elif "Procesando estrella" in linea and not analisis_iniciado:
-                        try:
-                            match = AppConstants.REGEX_PATTERNS['procesando_estrella'].search(linea)
-                            if match:
-                                actual = int(match.group(1))
-                                total = int(match.group(2))
-                                
-                                if total_estrellas == 0:
-                                    total_estrellas = total
-                                    analisis_iniciado = True
-                                    # Solo inicializar, no actualizar progreso aquí
-                                    self.progreso_estrellas.emit(0, total)
-                                    self.detalle_cambiado.emit(f"Iniciando procesamiento de {total} estrellas...")
-                                
-                        except Exception as e:
-                            self.log_agregado.emit(f"[ERROR] Error parseando progreso de estrella: {e}")
-                    
-                    # Detectar errores en estrellas (incrementar contador también)
+                    # Detectar errores en estrellas
                     elif "[ERROR] Error en estrella" in linea:
                         try:
                             match = AppConstants.REGEX_PATTERNS['estrella_error'].search(linea)
@@ -837,17 +797,13 @@ class WorkerThread(QThread):
                                 estrella_nombre = match.group(1)
                                 self.detalle_cambiado.emit(f"[ERROR] Error en {estrella_nombre}")
                             else:
-                                # Fallback sin regex
                                 self.detalle_cambiado.emit("[ERROR] Error en procesamiento de estrella")
                             
-                            # Incrementar contador local (estrella fallida también cuenta como procesada)
                             estrellas_procesadas += 1
                             if total_estrellas > 0:
                                 self.progreso_estrellas.emit(estrellas_procesadas, total_estrellas)
-                                
                         except Exception as e:
                             self.log_agregado.emit(f"[ERROR] Error parseando error de estrella: {e}")
-                    
                     
                     # Detectar procesamiento completado
                     elif "Procesamiento completado." in linea:
@@ -855,38 +811,36 @@ class WorkerThread(QThread):
                             self.progreso_estrellas.emit(total_estrellas, total_estrellas)
                         self.estado_cambiado.emit("¡Análisis completado exitosamente!", 100)
                         self.detalle_cambiado.emit("Procesamiento completado")
-                    
-                    # Detectar fases específicas del análisis
-                    elif "Ejecutando análisis GLS" in linea:
-                        self.detalle_cambiado.emit("Ejecutando análisis GLS...")
-                    elif "Ejecutando análisis PDM" in linea:
-                        self.detalle_cambiado.emit("Ejecutando análisis PDM...")
-                    elif "Generando visualizaciones" in linea:
-                        self.detalle_cambiado.emit("Generando gráficos...")
-                    elif "Guardando resultados" in linea:
-                        self.detalle_cambiado.emit("Guardando resultados...")
-                    elif "Reporte detallado guardado" in linea:
-                        self.detalle_cambiado.emit("Guardando reporte detallado...")
-                    
-                    # Detectar inicio de procesamiento si no se detectó el total antes
-                    elif "procesamiento" in linea.lower() and total_estrellas == 0:
-                        self.detalle_cambiado.emit("Iniciando procesamiento...")
-                        if not analisis_iniciado:
-                            # Asumir al menos 1 estrella para mostrar progreso
-                            total_estrellas = 1
-                            self.progreso_estrellas.emit(0, 1)
-                            analisis_iniciado = True
-                    
-                    # Fallback: si vemos cualquier mención de estrellas pero no hemos iniciado análisis
-                    elif not analisis_iniciado and ("estrella" in linea.lower() or "star" in linea.lower()):
-                        if AppConstants.DEBUG_MODE:
-                            self.log_agregado.emit(f"[DEBUG] Fallback - detectando mención de estrella: '{linea}'")
-                        if total_estrellas == 0:
-                            total_estrellas = 1  # Asumir al menos una estrella
-                            self.progreso_estrellas.emit(0, 1)
-                            analisis_iniciado = True
-                            self.detalle_cambiado.emit("Iniciando análisis de estrellas...")
-            
+                
+                # Configurar argumentos para procesofull.py
+                original_argv = sys.argv.copy()
+                sys.argv = [
+                    'procesofull.py',
+                    '--analisis', analysis_name,
+                    '--pend', str(self.periodo_max),
+                    '--pbeg', str(self.periodo_min)
+                ]
+                
+                # Capturar output en tiempo real
+                stdout_capture = RealTimeOutputCapture(process_output_line)
+                stderr_capture = StringIO()
+                
+                original_stdout = sys.stdout
+                sys.stdout = stdout_capture
+                
+                try:
+                    procesofull.main()
+                    resultado_exitoso = True
+                except SystemExit as e:
+                    resultado_exitoso = (e.code == 0)
+                except Exception as e:
+                    resultado_exitoso = False
+                    stderr_capture.write(f"Error: {e}")
+                finally:
+                    sys.stdout = original_stdout
+                
+                sys.argv = original_argv
+                
                 if self.ventana_progreso.cancelado:
                     return False
                 
@@ -894,6 +848,7 @@ class WorkerThread(QThread):
                     self.log_agregado.emit("<b>Procesamiento completado</b>")
                     return True
                 else:
+                    error_output = stderr_capture.getvalue()
                     self.log_agregado.emit(f"<b>ERROR al ejecutar procesofull.py</b>")
                     if error_output:
                         self.log_agregado.emit(f"Error: {error_output}")
