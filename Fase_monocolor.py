@@ -30,7 +30,7 @@ class FaseMonocolor:
         files = os.listdir(route)
 
         fileV = next((f for f in files if f.endswith('V')), None)
-        fileI = next((f for f in files if f.endswith('i')), None)
+        fileI = next((f for f in files if f.endswith('I')), None)
 
         if not (fileV and fileI):
             return {

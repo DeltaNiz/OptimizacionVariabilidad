@@ -76,7 +76,7 @@ def process_single_star(star_data, Pend=3, Pbeg=0.01):
         star_number = int(star_name[4:])
         
         fileV = next((f for f in files if f.endswith('V')), None)
-        fileI = next((f for f in files if f.endswith('i')), None)
+        fileI = next((f for f in files if f.endswith('I')), None)
         
         if not (fileV and fileI):
             return {
