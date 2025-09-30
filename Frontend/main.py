@@ -50,41 +50,35 @@ class Main(QMainWindow):
         screen_height = screen_geometry.height()
         vertical_offset = 0
         
-        print(f"Resolución de pantalla: {screen_width}x{screen_height}")
-        print(f"Tipo de pantalla detectado: {'Pequeña' if screen_width <= 1366 else 'Mediana' if screen_width <= 1920 else 'Grande'}")
-        
         # Lógica similar a media queries
         if screen_width <= 1366:  # Pantallas pequeñas/laptops
             self.resize(480, 200)
-            self.setWindowTitle("Nombre de Aplicación - Pantalla Pequeña")
+            self.setWindowTitle("SODEV-CG")
             margin_y_size = "42px"  # Menos margen para pantallas pequeñas
             margin_x_size = "83px"  # Menos margen para pantallas pequeñas
-            text_size = "24px"  # Tamaño de texto más pequeño
+            text_size = "28px"  # Tamaño de texto más pequeño
             vertical_offset = -95
             # Guardar dimensiones para fijar al final
             self.fixed_width, self.fixed_height = 490, 290
-            print(f"Configuración aplicada: Pantalla pequeña - Ventana: {self.width()}x{self.height()}")
 
         elif screen_width <= 1920:  # Pantallas medianas/Full HD
             self.resize(600, 280)
-            self.setWindowTitle("Nombre de Aplicación - Pantalla Mediana")
+            self.setWindowTitle("SODEV-CG")
             margin_y_size = "50px"  # Margen muy pequeño para ventana mediana
             margin_x_size = "100px"  # Margen muy pequeño para ventana mediana
             text_size = "36px"  # Tamaño de texto intermedio
             vertical_offset = -95
             # Guardar dimensiones para fijar al (las resoluciones son distintas al resize porque pyqt asi lo quiso xd)
             self.fixed_width, self.fixed_height = 600, 330
-            print(f"Configuración aplicada: Pantalla mediana - Ventana: {self.width()}x{self.height()}")
 
         else:  # Pantallas grandes/4K
             self.resize(1600, 1000)
-            self.setWindowTitle("Nombre de Aplicación - Pantalla Grande")
+            self.setWindowTitle("SODEV-CG")
             margin_size = "300px"  # Margen grande para pantallas grandes
             text_size = "42px"  # Tamaño de texto grande
             vertical_offset = -20
             # Guardar dimensiones para fijar al final
             self.fixed_width, self.fixed_height = 1600, 1000
-            print(f"Configuración aplicada: Pantalla grande - Ventana: {self.width()}x{self.height()}")
         
         # Centrar la ventana en la pantalla con un offset vertical
         center_point = desktop.screen().rect().center() - self.rect().center()
@@ -94,12 +88,12 @@ class Main(QMainWindow):
         central_label = QLabel()
 
         # Usar HTML para diferentes tamaños de texto
-        welcome_text = "¡Bienvenido!"
+        welcome_text = "SODEV-CG"
         subtitle_text = "Suba un archivo para realizar el análisis"
         
         # Definir el tamaño del subtítulo basado en el tamaño principal
-        if text_size == "24px":
-            subtitle_size = "14px"
+        if text_size == "28px":
+            subtitle_size = "13px"
         elif text_size == "36px":
             subtitle_size = "18px"
         else:
@@ -108,7 +102,7 @@ class Main(QMainWindow):
         # Combinar ambos textos con HTML
         combined_text = f"""
             <div style="text-align: center;">
-                <div style="font-size: {text_size}; font-weight: bold; margin-bottom: 10px;">
+                <div style="font-size: {text_size}; font-weight: bold; font-style: italic; margin-bottom: 10px;">
                     {welcome_text}
                 </div>
                 <div style="font-size: {subtitle_size}; font-weight: normal; opacity: 0.9;">
@@ -137,7 +131,7 @@ class Main(QMainWindow):
         
         # Crear pie de página
         footer_label = QLabel()
-        footer_text = "Nombre de aplicación | Versión 0.1.0"
+        footer_text = "¡Bienvenido! | Versión 0.1.0"
         footer_label.setText(footer_text)
         footer_label.setAlignment(Qt.AlignCenter)
         footer_label.setStyleSheet("""

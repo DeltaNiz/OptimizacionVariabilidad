@@ -306,19 +306,16 @@ class DatosNF(QMainWindow):
         
         if screen_width <= AppConstants.SCREEN_SMALL:
             self.window_size = AppConstants.WINDOW_SMALL
-            self.setWindowTitle("Optim. Estrellas - Pantalla Pequeña")
+            self.setWindowTitle("SODEV-CG")
             layout_margin = 9
-            print(f"Configuración aplicada: Pantalla pequeña - Ventana: {self.window_size[0]}x{self.window_size[1]}")
         elif screen_width <= AppConstants.SCREEN_MEDIUM:
             self.window_size = AppConstants.WINDOW_MEDIUM
-            self.setWindowTitle("Optim. Estrellas - Pantalla Mediana")
+            self.setWindowTitle("SODEV-CG")
             layout_margin = 5
-            print(f"Configuración aplicada: Pantalla mediana - Ventana: {self.window_size[0]}x{self.window_size[1]}")
         else:
             self.window_size = AppConstants.WINDOW_LARGE
-            self.setWindowTitle("Optim. Estrellas - Pantalla Grande")
+            self.setWindowTitle("SODEV-CG")
             layout_margin = 20
-            print(f"Configuración aplicada: Pantalla grande - Ventana: {self.window_size[0]}x{self.window_size[1]}")
         
         return layout_margin
 

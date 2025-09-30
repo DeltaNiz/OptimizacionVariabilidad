@@ -28,6 +28,7 @@ a = Analysis([
         ('Frontend/DatosF.py', 'Frontend/'),
         ('Frontend/DatosNF.py', 'Frontend/'),
         ('Frontend/SubirArchivos.py', 'Frontend/'),
+        ('media/icono.ico', 'media/'),  # Incluir el icono en formato ICO
         # Agrega aquí otros archivos de datos necesarios
     ],
     hiddenimports=hiddenimports,
@@ -48,7 +49,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='OptimizacionVariabilidad',
+    name='SEODEV-CG',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -60,5 +61,6 @@ exe = EXE(
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
-    entitlements_file=None
+    entitlements_file=None,
+    icon='media/icono.ico'  # Establecer el icono del ejecutable con múltiples tamaños
 )
