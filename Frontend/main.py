@@ -1,7 +1,9 @@
 from PyQt5.QtWidgets import QApplication, QWidget, QDesktopWidget, QMainWindow, QMenuBar, QLabel, QVBoxLayout
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon
 import SubirArchivos
 import sys
+import os
 import multiprocessing as mp
 
 # Configuración especial para PyInstaller y multiprocessing
@@ -43,6 +45,17 @@ class Main(QMainWindow):
         self.ventana_subir.show()
 
     def init_ui(self):
+        # Configurar el icono de la ventana
+        if hasattr(sys, '_MEIPASS'):
+            # Ruta del icono cuando está empaquetado con PyInstaller
+            icon_path = os.path.join(sys._MEIPASS, 'media', 'icono.ico')
+        else:
+            # Ruta del icono en desarrollo
+            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'media', 'icono.ico')
+        
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        
         # Obtener información de la pantalla
         desktop = QDesktopWidget()
         screen_geometry = desktop.screenGeometry()

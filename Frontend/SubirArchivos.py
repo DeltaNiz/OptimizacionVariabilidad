@@ -4,9 +4,11 @@ from PyQt5.QtWidgets import (
     QFileDialog, QProgressBar, QMessageBox
 )
 from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
-from PyQt5.QtGui import QCursor
+from PyQt5.QtGui import QCursor, QIcon
 import DatosNF
 import time
+import os
+import sys
 
 class AppConstants:
     """Constantes centralizadas para la aplicación SubirArchivos"""
@@ -145,6 +147,14 @@ class SubirArchivos(QMainWindow):
         """Inicializa la interfaz de usuario de manera modular"""
         self.resize(AppConstants.WINDOW_WIDTH, AppConstants.WINDOW_HEIGHT)
         self.setWindowTitle("Subir Archivo")
+        
+        # Configurar el icono de la ventana
+        if hasattr(sys, '_MEIPASS'):
+            icon_path = os.path.join(sys._MEIPASS, 'media', 'icono.ico')
+        else:
+            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'media', 'icono.ico')
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
 
         # Configurar formulario principal
         form_layout = self._setup_form_layout()

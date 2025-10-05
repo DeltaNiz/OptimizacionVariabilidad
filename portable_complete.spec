@@ -28,6 +28,7 @@ a = Analysis([
         ('Frontend/DatosF.py', 'Frontend/'),
         ('Frontend/DatosNF.py', 'Frontend/'),
         ('Frontend/SubirArchivos.py', 'Frontend/'),
+        ('descarteFAP.py','.'),
         ('media/icono.ico', 'media/'),  # Incluir el icono en formato ICO
         # Agrega aquí otros archivos de datos necesarios
     ],

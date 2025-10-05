@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
     QLineEdit, QFrame, QCheckBox, QMessageBox
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QCursor, QColor
+from PyQt5.QtGui import QCursor, QColor, QIcon
 import sys
 import pandas as pd
 import os
@@ -241,6 +241,14 @@ class DatosNF(QMainWindow):
     def init_ui(self):
         """Inicializa la interfaz de usuario de manera modular"""
         self.setWindowTitle("Optim. Estrellas")
+        
+        # Configurar el icono de la ventana
+        if hasattr(sys, '_MEIPASS'):
+            icon_path = os.path.join(sys._MEIPASS, 'media', 'icono.ico')
+        else:
+            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'media', 'icono.ico')
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
         
         # Configuración responsiva de pantalla
         layout_margin = self._configure_screen_layout()

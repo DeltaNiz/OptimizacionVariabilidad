@@ -1,10 +1,10 @@
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QPushButton, QLabel,
-    QFrame, QScrollArea, QMessageBox, QFileDialog
+    QFrame, QScrollArea, QMessageBox, QFileDialog, QAbstractItemView
 )
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QCursor, QPixmap
+from PyQt5.QtGui import QCursor, QPixmap, QIcon
 import os
 import sys
 import pandas as pd
@@ -193,6 +193,15 @@ class DatosF(QMainWindow):
     
     def init_ui(self):
         self.setWindowTitle("Resultados del Análisis")
+        
+        # Configurar el icono de la ventana
+        if hasattr(sys, '_MEIPASS'):
+            icon_path = os.path.join(sys._MEIPASS, 'media', 'icono.ico')
+        else:
+            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'media', 'icono.ico')
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        
         screen_width = self.screen().size().width()
         
         # Configuración responsiva optimizada con constantes
@@ -1019,24 +1028,27 @@ class DatosF(QMainWindow):
 
     def cargar_datos_csv_filtrado(self):
         """Carga los datos del CSV filtrado generado en la carpeta de análisis de manera optimizada"""
-        # Primera prioridad: ruta específica del CSV filtrado
-        if self.ruta_csv_filtrado and os.path.exists(self.ruta_csv_filtrado):
-            if self._cargar_csv_seguro(self.ruta_csv_filtrado):
-                return
-        
-        # Segunda prioridad: buscar en carpeta de análisis específica
+        # PRIMERA PRIORIDAD: buscar datos_filtrados_FAP.csv en data_folder
         if self.data_folder:
-            csv_encontrado = self._buscar_csv_filtrado_en_carpeta(self.data_folder)
-            if csv_encontrado and self._cargar_csv_seguro(csv_encontrado):
-                return
+            csv_fap = os.path.join(self.data_folder, 'datos_filtrados_FAP.csv')
+            if os.path.exists(csv_fap):
+                if self._cargar_csv_seguro(csv_fap):
+                    return
         
-        # Tercera prioridad: buscar en directorio raíz del proyecto
+        # SEGUNDA PRIORIDAD: usar ruta_csv_filtrado si apunta a datos_filtrados_FAP.csv
+        if self.ruta_csv_filtrado and os.path.exists(self.ruta_csv_filtrado):
+            nombre = os.path.basename(self.ruta_csv_filtrado)
+            if nombre == 'datos_filtrados_FAP.csv':
+                if self._cargar_csv_seguro(self.ruta_csv_filtrado):
+                    return
+        
+        # TERCERA PRIORIDAD: buscar en directorio raíz del proyecto
         csv_encontrado = self._buscar_csv_filtrado_en_raiz()
         if csv_encontrado and self._cargar_csv_seguro(csv_encontrado):
             return
         
         # Si no se encuentra nada
-        print("No se encontró CSV de datos filtrados")
+        print("No se encontró datos_filtrados_FAP.csv")
 
     def _cargar_csv_seguro(self, ruta_csv):
         """Carga un CSV de manera segura con manejo de errores optimizado"""
@@ -1049,16 +1061,16 @@ class DatosF(QMainWindow):
             return False
 
     def _buscar_csv_filtrado_en_carpeta(self, carpeta):
-        """Busca archivos CSV filtrados en una carpeta específica"""
+        """Busca OBLIGATORIAMENTE datos_filtrados_FAP.csv en la carpeta especificada"""
         try:
-            csvs_filtrados = [
-                os.path.join(carpeta, archivo)
-                for archivo in os.listdir(carpeta)
-                if archivo.startswith('datos_filtrados_') and archivo.endswith('.csv')
-            ]
-            return max(csvs_filtrados, key=os.path.getmtime) if csvs_filtrados else None
+            # Solo buscar datos_filtrados_FAP.csv (con filtro FAP aplicado)
+            csv_fap = os.path.join(carpeta, 'datos_filtrados_FAP.csv')
+            if os.path.exists(csv_fap):
+                return csv_fap
+            return None
+            
         except Exception as e:
-            print(f"Error al buscar CSVs filtrados en {carpeta}: {e}")
+            print(f"Error al buscar datos_filtrados_FAP.csv: {e}")
             return None
 
     def _buscar_csv_filtrado_en_raiz(self):
@@ -1067,17 +1079,22 @@ class DatosF(QMainWindow):
         return self._buscar_csv_filtrado_en_carpeta(script_dir)
     
     def cargar_csv_datos_filtrados(self, ruta_csv):
-        """Carga datos desde el CSV de datos filtrados (sin headers)"""
+        """Carga datos OBLIGATORIAMENTE desde datos_filtrados_FAP.csv (con encabezados)"""
         try:
-            # Leer CSV sin headers (como se genera en el análisis)
-            df = pd.read_csv(ruta_csv, header=None)
+            # Verificar que sea datos_filtrados_FAP.csv
+            nombre_archivo = os.path.basename(ruta_csv)
             
-            # Asignar nombres de columnas según el formato generado
-            if len(df.columns) == 4:
-                df.columns = ['V', 'I', 'MV', 'MI']
-            else:
-                # Si tiene diferente número de columnas, usar nombres genéricos
-                df.columns = [f'Col_{i+1}' for i in range(len(df.columns))]
+            if nombre_archivo != 'datos_filtrados_FAP.csv':
+                print(f"Error: Solo se acepta datos_filtrados_FAP.csv, se intentó cargar: {nombre_archivo}")
+                return
+            
+            # Verificar que el archivo existe
+            if not os.path.exists(ruta_csv):
+                print(f"Error: El archivo no existe: {ruta_csv}")
+                return
+            
+            # Leer CSV con encabezados
+            df = pd.read_csv(ruta_csv)
             
             # Agregar columna de número de estrella (índice + 1)
             df.insert(0, 'N°', range(1, len(df) + 1))
@@ -1109,7 +1126,8 @@ class DatosF(QMainWindow):
             
         except Exception as e:
             print(f"Error al cargar CSV de datos filtrados: {e}")
-            # self.mostrar_datos_ejemplo()
+            import traceback
+            traceback.print_exc()
 
     def cargar_imagenes_estrellas(self):
         """Carga las imágenes generadas por procesofull.py y Fase_monocolor.py desde las carpetas de estrellas de manera optimizada"""
@@ -1236,14 +1254,21 @@ class DatosF(QMainWindow):
             return
         
         try:
-            numero_estrella = self.imagenes_estrellas[self.imagen_actual_index]['estrella']
+            # El índice de la imagen corresponde directamente al índice de la fila en la tabla
+            # ya que ambos están filtrados con las mismas estrellas
+            fila = self.imagen_actual_index
             
-            # Buscar la fila que corresponde a esta estrella
-            for row in range(self.table_main.rowCount()):
-                item_primera_columna = self.table_main.item(row, 0)
-                if item_primera_columna and item_primera_columna.text() == numero_estrella:
-                    self.table_main.selectRow(row)
-                    break
+            # Verificar que la fila existe en la tabla
+            if fila < self.table_main.rowCount():
+                self.table_main.selectRow(fila)
+                # Asegurar que la fila sea visible (scroll automático)
+                self.table_main.scrollToItem(
+                    self.table_main.item(fila, 0),
+                    QAbstractItemView.PositionAtCenter
+                )
+            else:
+                print(f"[WARNING] Fila {fila} fuera de rango (tabla tiene {self.table_main.rowCount()} filas)")
+                
         except Exception as e:
             print(f"Error al seleccionar fila de estrella: {e}")
 

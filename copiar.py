@@ -5,6 +5,7 @@ import sys
 import argparse
 from datetime import datetime
 from pathlib import Path
+import glob
 
 # Importar la configuración portable
 try:
@@ -13,6 +14,14 @@ try:
 except ImportError:
     PORTABLE_MODE = False
 
+# Importar verificador de descarteFAP
+try:
+    from descarteFAP import verificar_par_archivos
+    FAP_FILTER_AVAILABLE = True
+except ImportError:
+    FAP_FILTER_AVAILABLE = False
+    print("[ADVERTENCIA] No se pudo importar descarteFAP, se copiarán todas las estrellas sin filtro FAP")
+
 def main():
     # Configurar argumentos de línea de comandos
     parser = argparse.ArgumentParser(description='Copiar archivos de estrellas a carpetas organizadas')
@@ -20,6 +29,9 @@ def main():
     parser.add_argument('--subcarpeta', help='Nombre de la subcarpeta dentro de data')
     parser.add_argument('--lc_i', help='Ruta específica de la carpeta con archivos I')
     parser.add_argument('--lc_v', help='Ruta específica de la carpeta con archivos V')
+    parser.add_argument('--aplicar_fap', action='store_true', help='Aplicar filtro FAP antes de copiar')
+    parser.add_argument('--pbeg', type=float, default=0.01, help='Período mínimo para análisis GLS (default: 0.01)')
+    parser.add_argument('--pend', type=float, default=3.0, help='Período máximo para análisis GLS (default: 3.0)')
     
     args = parser.parse_args()
     
@@ -117,6 +129,18 @@ def main():
     
     archivos_copiados = 0
     archivos_no_encontrados = 0
+    estrellas_rechazadas_fap = 0
+    estrellas_aprobadas = 0
+    
+    # Determinar si aplicar filtro FAP
+    aplicar_filtro_fap = args.aplicar_fap and FAP_FILTER_AVAILABLE
+    
+    if aplicar_filtro_fap:
+        print(f"[INFO] Filtro FAP activado (Pbeg={args.pbeg}, Pend={args.pend})")
+        print(f"[INFO] Solo se copiarán estrellas que pasen los filtros FAP y amplitud")
+    
+    # CSV para guardar estrellas que pasan el filtro FAP
+    estrellas_fap = []
     
     for i, row in df.iterrows():
         archivoV = row[0]
@@ -124,34 +148,80 @@ def main():
 
         star_name = f'star{i+1}'
         
-        # Crear carpeta de estrella (tanto en modo portable como legado)
+        # Verificar si los archivos existen antes de cualquier procesamiento
+        src1 = os.path.join(carpeta1, archivoI)
+        src2 = os.path.join(carpeta2, archivoV)
+        
+        if not os.path.exists(src1):
+            print(f"Archivo no encontrado: {src1}")
+            archivos_no_encontrados += 1
+            continue
+            
+        if not os.path.exists(src2):
+            print(f"Archivo no encontrado: {src2}")
+            archivos_no_encontrados += 1
+            continue
+        
+        # Aplicar filtro FAP si está activado
+        if aplicar_filtro_fap:
+            try:
+                pasa_filtros, info = verificar_par_archivos(
+                    src2, src1,  # V, I
+                    Pbeg=args.pbeg, 
+                    Pend=args.pend
+                )
+                
+                if not pasa_filtros:
+                    estrellas_rechazadas_fap += 1
+                    if 'error' in info:
+                        print(f"[FAP RECHAZADO] {star_name} - Error: {info['error']}")
+                    else:
+                        print(f"[FAP RECHAZADO] {star_name} - FAP:{info.get('pasa_FAP', False)}, Amp:{info.get('pasa_amplitud', False)}")
+                    continue  # No crear carpeta ni copiar archivos
+                else:
+                    estrellas_aprobadas += 1
+                    estrellas_fap.append([archivoV, archivoI])
+                    print(f"[FAP APROBADO] {star_name}")
+                    
+            except Exception as e:
+                print(f"[FAP ERROR] {star_name} - {e}")
+                estrellas_rechazadas_fap += 1
+                continue
+        
+        # Crear carpeta de estrella solo si pasa todos los filtros
         stars = os.path.join(data, star_name)
         os.makedirs(stars, exist_ok=True)
 
         # Copiar archivo I
-        src1 = os.path.join(carpeta1, archivoI)
         dest1 = os.path.join(stars, archivoI)
-
-        if os.path.exists(src1):
-            shutil.copy(src1, dest1)
-            archivos_copiados += 1
-        else:
-            print(f"Archivo no encontrado: {src1}")
-            archivos_no_encontrados += 1
+        shutil.copy(src1, dest1)
+        archivos_copiados += 1
 
         # Copiar archivo V
-        src2 = os.path.join(carpeta2, archivoV)
         dest2 = os.path.join(stars, archivoV)
-
-        if os.path.exists(src2):
-            shutil.copy(src2, dest2)
-            archivos_copiados += 1
+        shutil.copy(src2, dest2)
+        archivos_copiados += 1
+    
+    # Guardar CSV de estrellas que pasaron FAP (incluso si está vacío)
+    if aplicar_filtro_fap:
+        csv_fap_path = os.path.join(data, 'FAPRevision.csv')
+        pd.DataFrame(estrellas_fap, columns=['archivo_V', 'archivo_I']).to_csv(csv_fap_path, index=False, header=False)
+        if estrellas_fap:
+            print(f"[INFO] Archivo FAPRevision.csv guardado con {len(estrellas_fap)} estrellas")
+            print(f"[INFO] La intersección con datos_filtrados se generará después del análisis")
         else:
-            print(f"Archivo no encontrado: {src2}")
-            archivos_no_encontrados += 1
+            print(f"[WARNING] Archivo FAPRevision.csv generado VACÍO - Todas las estrellas fueron rechazadas")
     
     print(f"Proceso completado")
-    print(f"Carpetas creadas: {len(df)}")
+    
+    if aplicar_filtro_fap:
+        print(f"Estrellas procesadas: {len(df)}")
+        print(f"Estrellas aprobadas FAP: {estrellas_aprobadas}")
+        print(f"Estrellas rechazadas FAP: {estrellas_rechazadas_fap}")
+        print(f"Carpetas creadas: {estrellas_aprobadas}")
+    else:
+        print(f"Carpetas creadas: {len(df)}")
+    
     print(f"Archivos copiados: {archivos_copiados}")
     print(f"Archivos no encontrados: {archivos_no_encontrados}")
 

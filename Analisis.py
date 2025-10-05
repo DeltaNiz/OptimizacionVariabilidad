@@ -24,7 +24,7 @@ class AppConstants:
             documents_path = Path.home() / "Documents"
             
             # Crear carpeta específica de la aplicación
-            app_folder = documents_path / "OptimizacionVariabilidad"
+            app_folder = documents_path / "SODEV-CG"
             
             # Crear carpetas necesarias si no existen
             app_folder.mkdir(exist_ok=True)
@@ -496,6 +496,34 @@ class WorkerThread(QThread):
                 else:
                     self.analisis_terminado.emit(False, "Error al generar el archivo CSV final")
                 return
+            
+            # Generar intersección con FAPRevision.csv si existe
+            ruta_csv_fap, num_estrellas_fap = self.generar_interseccion_fap(data_folder, ruta_csv)
+            
+            # Verificar si el filtro FAP rechazó todas las estrellas
+            # Caso 1: FAPRevision.csv existe pero tiene 0 estrellas
+            # Caso 2: No se generó FAPRevision.csv pero aplicar_fap estaba activado (verificar por carpetas vacías)
+            filtro_fap_activo = os.path.exists(os.path.join(data_folder, 'FAPRevision.csv'))
+            
+            if filtro_fap_activo and num_estrellas_fap == 0:
+                # El filtro FAP descartó todas las estrellas
+                self.log_agregado.emit("⚠️ ADVERTENCIA: El filtro FAP descartó todas las estrellas")
+                self.log_agregado.emit("⚠️ No hay estrellas válidas para analizar")
+                self._limpiar_archivos_temporales()
+                self.analisis_terminado.emit(
+                    False, 
+                    "❌ Filtro FAP: Todas las estrellas fueron descartadas\n\n"
+                    "El análisis GLS determinó que ninguna estrella cumple con los criterios:\n"
+                    "• False Alarm Probability (FAP) < 0.1%\n"
+                    "• Amplitud > 2 × RMS"
+                )
+                return
+            
+            # Si se generó el CSV con filtro FAP, usar ese en lugar del original
+            if ruta_csv_fap:
+                self.ruta_csv_generado = ruta_csv_fap
+                self.log_agregado.emit(f"Usando CSV con filtro FAP para DatosF: {os.path.basename(ruta_csv_fap)}")
+                self.log_agregado.emit(f"Estrellas que pasaron el filtro FAP: {num_estrellas_fap}")
                 
             self.fase_analisis.emit("Procesando estrellas...", 25)
             
@@ -585,6 +613,85 @@ class WorkerThread(QThread):
             self.log_agregado.emit(f"Error al generar CSV automático: {str(e)}")
             return None
     
+    def generar_interseccion_fap(self, data_folder, ruta_csv_filtrados):
+        """Genera el archivo datos_filtrados_FAP.csv con la intersección de FAPRevision y datos_filtrados
+        
+        Returns:
+            tuple: (ruta_csv: str|None, num_estrellas: int)
+                - ruta_csv: Ruta al archivo datos_filtrados_FAP.csv generado, o None si no se aplicó filtro FAP
+                - num_estrellas: Número de estrellas que pasaron el filtro (0 si no se aplicó filtro)
+        """
+        try:
+            import glob
+            
+            # Buscar archivo FAPRevision.csv
+            fap_revision_path = os.path.join(data_folder, 'FAPRevision.csv')
+            
+            if not os.path.exists(fap_revision_path):
+                self.log_agregado.emit("[INFO] No se encontró FAPRevision.csv (filtro FAP no aplicado)")
+                return None, 0
+            
+            self.log_agregado.emit("Generando intersección FAP con datos_filtrados...")
+            
+            # Leer FAPRevision.csv (sin encabezados)
+            fap_revision = pd.read_csv(fap_revision_path, header=None, names=['archivo_V', 'archivo_I'])
+            
+            # Leer datos_filtrados.csv (SIN encabezados, asignar nombres de columnas manualmente)
+            datos_filtrados = pd.read_csv(ruta_csv_filtrados, header=None, names=['V', 'I', 'MV', 'MI'])
+            
+            self.log_agregado.emit(f"Datos filtrados cargados: {len(datos_filtrados)} estrellas")
+            self.log_agregado.emit(f"FAPRevision cargado: {len(fap_revision)} pares aprobados")
+            
+            # Crear conjunto de pares (V, I) de FAPRevision para búsqueda rápida
+            fap_set = set(zip(fap_revision['archivo_V'], fap_revision['archivo_I']))
+            
+            # Las columnas son 'V' e 'I' (nombres de archivos)
+            col_v = 'V'
+            col_i = 'I'
+            
+            self.log_agregado.emit(f"Usando columnas para intersección: {col_v} y {col_i}")
+            
+            # Filtrar filas que están en FAPRevision
+            mask = datos_filtrados.apply(
+                lambda row: (row[col_v], row[col_i]) in fap_set,
+                axis=1
+            )
+            
+            datos_interseccion = datos_filtrados[mask]
+            num_estrellas = len(datos_interseccion)
+            
+            # Guardar el CSV de intersección CON ENCABEZADOS
+            csv_interseccion_path = os.path.join(data_folder, 'datos_filtrados_FAP.csv')
+            datos_interseccion.to_csv(csv_interseccion_path, index=False)
+            
+            self.log_agregado.emit(f"✅ Intersección FAP generada: {num_estrellas} estrellas (de {len(datos_filtrados)} filtradas)")
+            self.log_agregado.emit(f"Archivo guardado: datos_filtrados_FAP.csv")
+            
+            # Eliminar el CSV original datos_filtrados_*.csv
+            try:
+                if os.path.exists(ruta_csv_filtrados):
+                    os.remove(ruta_csv_filtrados)
+                    self.log_agregado.emit(f"🗑️ Archivo original eliminado: {os.path.basename(ruta_csv_filtrados)}")
+            except Exception as e:
+                self.log_agregado.emit(f"⚠️ No se pudo eliminar el archivo original: {e}")
+            
+            # Eliminar FAPRevision.csv
+            try:
+                if os.path.exists(fap_revision_path):
+                    os.remove(fap_revision_path)
+                    self.log_agregado.emit(f"🗑️ Archivo FAPRevision.csv eliminado")
+            except Exception as e:
+                self.log_agregado.emit(f"⚠️ No se pudo eliminar FAPRevision.csv: {e}")
+            
+            # Retornar la ruta del CSV generado y el número de estrellas
+            return csv_interseccion_path, num_estrellas
+                
+        except Exception as e:
+            self.log_agregado.emit(f"⚠️ Error al generar intersección FAP: {e}")
+            import traceback
+            self.log_agregado.emit(traceback.format_exc())
+            return None, 0
+    
     def ejecutar_copiar_py(self, ruta_csv):
         """Ejecuta copiar.py automáticamente con el CSV generado"""
         try:
@@ -625,6 +732,14 @@ class WorkerThread(QThread):
             else:
                 self.log_agregado.emit("[WARNING] No se encontraron rutas de carpetas I/V en datos del formulario")
                 self.log_agregado.emit("[INFO] copiar.py buscará carpetas automáticamente")
+            
+            # Agregar parámetros de período y activar filtro FAP
+            cmd.extend(['--aplicar_fap'])
+            
+            # Usar el mismo valor de periodo max que en el formulario, pbeg siempre será 0.01
+            # (self.periodo_max y self.periodo_min ya están configurados en __init__)
+            cmd.extend(['--pend', str(self.periodo_max), '--pbeg', str(0.01)])
+            self.log_agregado.emit(f"[INFO] Filtro FAP activado: Pbeg={0.01}, Pend={self.periodo_max}")
             
             # Llamar directamente a copiar.py en lugar de usar subprocess
             try:
