@@ -52,7 +52,7 @@ def main():
                 script_dir,  # Mismo directorio del script
                 Path.cwd(),  # Directorio de trabajo actual
                 script_dir.parent,  # Directorio padre del script
-                Path.home() / "Documents" / "OptimizacionVariabilidad",  # Documents del usuario
+                Path.home() / "Documents" / "SODEV-CG",  # Documents del usuario
             ]
             
             # Buscar carpeta lc_i
@@ -119,7 +119,6 @@ def main():
     # Leer el CSV
     try:
         df = pd.read_csv(archivo_csv, skiprows=0, header=None)
-        print(f"Archivo CSV cargado: {len(df)} filas")
     except Exception as e:
         print(f"Error al leer CSV: {e}")
         return
@@ -136,7 +135,6 @@ def main():
     aplicar_filtro_fap = args.aplicar_fap and FAP_FILTER_AVAILABLE
     
     if aplicar_filtro_fap:
-        print(f"[INFO] Filtro FAP activado (Pbeg={args.pbeg}, Pend={args.pend})")
         print(f"[INFO] Solo se copiarán estrellas que pasen los filtros FAP y amplitud")
     
     # CSV para guardar estrellas que pasan el filtro FAP
@@ -206,13 +204,6 @@ def main():
     if aplicar_filtro_fap:
         csv_fap_path = os.path.join(data, 'FAPRevision.csv')
         pd.DataFrame(estrellas_fap, columns=['archivo_V', 'archivo_I']).to_csv(csv_fap_path, index=False, header=False)
-        if estrellas_fap:
-            print(f"[INFO] Archivo FAPRevision.csv guardado con {len(estrellas_fap)} estrellas")
-            print(f"[INFO] La intersección con datos_filtrados se generará después del análisis")
-        else:
-            print(f"[WARNING] Archivo FAPRevision.csv generado VACÍO - Todas las estrellas fueron rechazadas")
-    
-    print(f"Proceso completado")
     
     if aplicar_filtro_fap:
         print(f"Estrellas procesadas: {len(df)}")

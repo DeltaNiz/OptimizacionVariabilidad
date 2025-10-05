@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import QApplication, QMessageBox, QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QTextEdit
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
+from PyQt5.QtGui import QIcon
 import pandas as pd
 import sys
 import argparse
@@ -136,6 +137,14 @@ class VentanaProgreso(QDialog):
         self.setFixedSize(500, 400)
         self.setModal(True)
         self.worker_thread = None  # Referencia al worker thread
+        
+        # Configurar el icono de la ventana
+        if hasattr(sys, '_MEIPASS'):
+            icon_path = os.path.join(sys._MEIPASS, 'media', 'icono.ico')
+        else:
+            icon_path = os.path.join(os.path.dirname(__file__), 'media', 'icono.ico')
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
         
         # Layout principal
         layout = QVBoxLayout()
@@ -298,6 +307,7 @@ class VentanaProgreso(QDialog):
     def accept(self):
         """Sobrescribir accept para abrir DatosF al cerrar si está disponible"""
         print("=== CERRANDO VENTANA DE PROGRESO ===")
+        print(f"datos_para_datosf: {self.datos_para_datosf}")
         
         # Si hay datos para abrir DatosF, abrirlo antes de cerrar
         if self.datos_para_datosf:
@@ -500,30 +510,30 @@ class WorkerThread(QThread):
             # Generar intersección con FAPRevision.csv si existe
             ruta_csv_fap, num_estrellas_fap = self.generar_interseccion_fap(data_folder, ruta_csv)
             
-            # Verificar si el filtro FAP rechazó todas las estrellas
-            # Caso 1: FAPRevision.csv existe pero tiene 0 estrellas
-            # Caso 2: No se generó FAPRevision.csv pero aplicar_fap estaba activado (verificar por carpetas vacías)
-            filtro_fap_activo = os.path.exists(os.path.join(data_folder, 'FAPRevision.csv'))
-            
-            if filtro_fap_activo and num_estrellas_fap == 0:
+            # Verificar si el filtro FAP fue aplicado y rechazó todas las estrellas
+            if ruta_csv_fap is not None and num_estrellas_fap == 0:
                 # El filtro FAP descartó todas las estrellas
                 self.log_agregado.emit("⚠️ ADVERTENCIA: El filtro FAP descartó todas las estrellas")
                 self.log_agregado.emit("⚠️ No hay estrellas válidas para analizar")
                 self._limpiar_archivos_temporales()
-                self.analisis_terminado.emit(
-                    False, 
+                
+                # Notificar que el análisis terminó con error (CRÍTICO - no se puede omitir)
+                # La señal analisis_terminado acepta solo 2 parámetros: (bool, str)
+                mensaje_fap = (
                     "❌ Filtro FAP: Todas las estrellas fueron descartadas\n\n"
                     "El análisis GLS determinó que ninguna estrella cumple con los criterios:\n"
                     "• False Alarm Probability (FAP) < 0.1%\n"
-                    "• Amplitud > 2 × RMS"
+                    "• Amplitud > 2 × RMS\n\n"
+                    "No hay estrellas válidas para continuar con el análisis."
                 )
+                self.analisis_terminado.emit(False, mensaje_fap)
+                
+                # Detener ejecución del worker thread
                 return
             
             # Si se generó el CSV con filtro FAP, usar ese en lugar del original
             if ruta_csv_fap:
                 self.ruta_csv_generado = ruta_csv_fap
-                self.log_agregado.emit(f"Usando CSV con filtro FAP para DatosF: {os.path.basename(ruta_csv_fap)}")
-                self.log_agregado.emit(f"Estrellas que pasaron el filtro FAP: {num_estrellas_fap}")
                 
             self.fase_analisis.emit("Procesando estrellas...", 25)
             
@@ -631,16 +641,11 @@ class WorkerThread(QThread):
                 self.log_agregado.emit("[INFO] No se encontró FAPRevision.csv (filtro FAP no aplicado)")
                 return None, 0
             
-            self.log_agregado.emit("Generando intersección FAP con datos_filtrados...")
-            
             # Leer FAPRevision.csv (sin encabezados)
             fap_revision = pd.read_csv(fap_revision_path, header=None, names=['archivo_V', 'archivo_I'])
             
             # Leer datos_filtrados.csv (SIN encabezados, asignar nombres de columnas manualmente)
             datos_filtrados = pd.read_csv(ruta_csv_filtrados, header=None, names=['V', 'I', 'MV', 'MI'])
-            
-            self.log_agregado.emit(f"Datos filtrados cargados: {len(datos_filtrados)} estrellas")
-            self.log_agregado.emit(f"FAPRevision cargado: {len(fap_revision)} pares aprobados")
             
             # Crear conjunto de pares (V, I) de FAPRevision para búsqueda rápida
             fap_set = set(zip(fap_revision['archivo_V'], fap_revision['archivo_I']))
@@ -648,8 +653,6 @@ class WorkerThread(QThread):
             # Las columnas son 'V' e 'I' (nombres de archivos)
             col_v = 'V'
             col_i = 'I'
-            
-            self.log_agregado.emit(f"Usando columnas para intersección: {col_v} y {col_i}")
             
             # Filtrar filas que están en FAPRevision
             mask = datos_filtrados.apply(
@@ -663,15 +666,11 @@ class WorkerThread(QThread):
             # Guardar el CSV de intersección CON ENCABEZADOS
             csv_interseccion_path = os.path.join(data_folder, 'datos_filtrados_FAP.csv')
             datos_interseccion.to_csv(csv_interseccion_path, index=False)
-            
-            self.log_agregado.emit(f"✅ Intersección FAP generada: {num_estrellas} estrellas (de {len(datos_filtrados)} filtradas)")
-            self.log_agregado.emit(f"Archivo guardado: datos_filtrados_FAP.csv")
-            
+
             # Eliminar el CSV original datos_filtrados_*.csv
             try:
                 if os.path.exists(ruta_csv_filtrados):
                     os.remove(ruta_csv_filtrados)
-                    self.log_agregado.emit(f"🗑️ Archivo original eliminado: {os.path.basename(ruta_csv_filtrados)}")
             except Exception as e:
                 self.log_agregado.emit(f"⚠️ No se pudo eliminar el archivo original: {e}")
             
@@ -679,7 +678,6 @@ class WorkerThread(QThread):
             try:
                 if os.path.exists(fap_revision_path):
                     os.remove(fap_revision_path)
-                    self.log_agregado.emit(f"🗑️ Archivo FAPRevision.csv eliminado")
             except Exception as e:
                 self.log_agregado.emit(f"⚠️ No se pudo eliminar FAPRevision.csv: {e}")
             
@@ -1050,6 +1048,10 @@ def realizar_analisis_completo(table_main, table_descartadas, datos_formulario, 
         worker.fase_analisis.connect(ventana_progreso.actualizar_fase_analisis)
         worker.log_agregado.connect(ventana_progreso.agregar_log)
         
+        # Función para mostrar alertas desde el thread principal
+        def mostrar_alerta_gui(titulo, mensaje):
+            QMessageBox.warning(None, titulo, mensaje)
+        
         resultado_final = [False, ""]
         callback_ejecutado = [False]  # Flag para saber si el callback terminó
         
@@ -1062,11 +1064,13 @@ def realizar_analisis_completo(table_main, table_descartadas, datos_formulario, 
             if ventana_progreso.cancelado:
                 print("Análisis cancelado")
                 ventana_progreso.analisis_completado(exito=False, cancelado=True)
+                ventana_progreso.datos_para_datosf = None
             else:
                 print("Análisis completado. Puedes cerrar la ventana para continuar.")
                 ventana_progreso.analisis_completado(exito)
                 
             # Guardar información del análisis para abrir DatosF después del cierre
+            # SOLO si el análisis fue exitoso
             if exito and hasattr(worker, 'data_folder_final'):
                 ventana_progreso.datos_para_datosf = {
                     'data_folder': worker.data_folder_final,
