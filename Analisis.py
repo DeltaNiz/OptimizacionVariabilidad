@@ -8,6 +8,7 @@ import os
 import subprocess
 from datetime import datetime
 import re
+from pathlib import Path
 
 class AppConstants:
     """Clase centralizada para todas las constantes del proyecto"""
@@ -306,9 +307,6 @@ class VentanaProgreso(QDialog):
     
     def accept(self):
         """Sobrescribir accept para abrir DatosF al cerrar si está disponible"""
-        print("=== CERRANDO VENTANA DE PROGRESO ===")
-        print(f"datos_para_datosf: {self.datos_para_datosf}")
-        
         # Si hay datos para abrir DatosF, abrirlo antes de cerrar
         if self.datos_para_datosf:
             print("Abriendo ventana DatosF...")
@@ -388,7 +386,6 @@ class WorkerThread(QThread):
     def forzar_cancelacion(self):
         """Fuerza la cancelación inmediata"""
         self.cancelacion_forzada = True
-        self.log_agregado.emit("=== CANCELACIÓN FORZADA ===")
         
         # Limpiar archivos temporales inmediatamente
         self._limpiar_archivos_temporales()
@@ -495,8 +492,16 @@ class WorkerThread(QThread):
             self.fase_analisis.emit("Generando archivo CSV final...", 22)
             self.log_agregado.emit("Generando archivo CSV final en carpeta de análisis...")
             
-            # Ahora generar el CSV final en la carpeta de análisis
-            ruta_csv = self.generar_csv_automatico()
+            try:
+                ruta_csv = self.generar_csv_automatico()
+            except Exception as e:
+                self.log_agregado.emit(f"Error al generar CSV automático: {e}")
+                import traceback
+                self.log_agregado.emit(f"Traceback: {traceback.format_exc()}")
+                self._limpiar_archivos_temporales()
+                self.analisis_terminado.emit(False, f"Error al generar CSV automático: {e}")
+                return
+                
             self.ruta_csv_generado = ruta_csv  # Guardar la ruta para DatosF
             
             if not ruta_csv or self.ventana_progreso.cancelado:
@@ -508,7 +513,15 @@ class WorkerThread(QThread):
                 return
             
             # Generar intersección con FAPRevision.csv si existe
-            ruta_csv_fap, num_estrellas_fap = self.generar_interseccion_fap(data_folder, ruta_csv)
+            try:
+                ruta_csv_fap, num_estrellas_fap = self.generar_interseccion_fap(data_folder, ruta_csv)
+            except Exception as e:
+                self.log_agregado.emit(f"Error en intersección FAP: {e}")
+                import traceback
+                self.log_agregado.emit(f"Traceback:\n{traceback.format_exc()}")
+                self._limpiar_archivos_temporales()
+                self.analisis_terminado.emit(False, f"Error al generar intersección FAP: {e}")
+                return
             
             # Verificar si el filtro FAP fue aplicado y rechazó todas las estrellas
             if ruta_csv_fap is not None and num_estrellas_fap == 0:
@@ -579,7 +592,9 @@ class WorkerThread(QThread):
             return ruta_destino
             
         except Exception as e:
-            self.log_agregado.emit(f"Error al generar CSV: {str(e)}")
+            self.log_agregado.emit(f"Error al generar CSV base: {str(e)}")
+            import traceback
+            self.log_agregado.emit(f"Traceback: {traceback.format_exc()}")
             return None
 
     def generar_csv_temporal(self):
@@ -621,6 +636,8 @@ class WorkerThread(QThread):
             
         except Exception as e:
             self.log_agregado.emit(f"Error al generar CSV automático: {str(e)}")
+            import traceback
+            self.log_agregado.emit(f"Traceback: {traceback.format_exc()}")
             return None
     
     def generar_interseccion_fap(self, data_folder, ruta_csv_filtrados):
@@ -638,34 +655,97 @@ class WorkerThread(QThread):
             fap_revision_path = os.path.join(data_folder, 'FAPRevision.csv')
             
             if not os.path.exists(fap_revision_path):
-                self.log_agregado.emit("[INFO] No se encontró FAPRevision.csv (filtro FAP no aplicado)")
+                self.log_agregado.emit("No se encontró FAPRevision.csv (filtro FAP no aplicado)")
+                return None, 0
+            
+            # Verificar el tamaño y contenido del archivo antes de leerlo
+            try:
+                fap_size = os.path.getsize(fap_revision_path)
+            except Exception as e:
+                self.log_agregado.emit(f"Error al verificar FAPRevision.csv: {e}")
+                import traceback
+                self.log_agregado.emit(f"Traceback: {traceback.format_exc()}")
                 return None, 0
             
             # Leer FAPRevision.csv (sin encabezados)
-            fap_revision = pd.read_csv(fap_revision_path, header=None, names=['archivo_V', 'archivo_I'])
+            try:
+                fap_revision = pd.read_csv(fap_revision_path, header=None, names=['archivo_V', 'archivo_I'])
+            except Exception as e:
+                self.log_agregado.emit(f"Error al leer FAPRevision.csv con pandas: {e}")
+                import traceback
+                self.log_agregado.emit(f"Traceback: {traceback.format_exc()}")
+                return None, 0
             
             # Leer datos_filtrados.csv (SIN encabezados, asignar nombres de columnas manualmente)
-            datos_filtrados = pd.read_csv(ruta_csv_filtrados, header=None, names=['V', 'I', 'MV', 'MI'])
+            # Verificar que el archivo existe y tiene contenido
+            if not os.path.exists(ruta_csv_filtrados):
+                self.log_agregado.emit(f"No existe el archivo: {ruta_csv_filtrados}")
+                return None, 0
             
+            file_size = os.path.getsize(ruta_csv_filtrados)
+            
+            if file_size == 0:
+                self.log_agregado.emit(f"El archivo está vacío: {ruta_csv_filtrados}")
+                return None, 0
+            
+            try:
+                datos_filtrados = pd.read_csv(ruta_csv_filtrados, header=None, names=['V', 'I', 'MV', 'MI'])
+            except Exception as e:
+                self.log_agregado.emit(f"Error al leer CSV: {e}")
+                import traceback
+                self.log_agregado.emit(f"Traceback: {traceback.format_exc()}")
+                return None, 0
+                
             # Crear conjunto de pares (V, I) de FAPRevision para búsqueda rápida
-            fap_set = set(zip(fap_revision['archivo_V'], fap_revision['archivo_I']))
+            try:
+                fap_set = set(zip(fap_revision['archivo_V'], fap_revision['archivo_I']))
+            except Exception as e:
+                self.log_agregado.emit(f"Error al crear conjunto FAP: {e}")
+                import traceback
+                self.log_agregado.emit(f"Traceback: {traceback.format_exc()}")
+                return None, 0
             
             # Las columnas son 'V' e 'I' (nombres de archivos)
             col_v = 'V'
             col_i = 'I'
             
             # Filtrar filas que están en FAPRevision
-            mask = datos_filtrados.apply(
-                lambda row: (row[col_v], row[col_i]) in fap_set,
-                axis=1
-            )
+            try:
+                mask = datos_filtrados.apply(
+                    lambda row: (row[col_v], row[col_i]) in fap_set,
+                    axis=1
+                )
+            except Exception as e:
+                self.log_agregado.emit(f"Error al aplicar máscara: {e}")
+                import traceback
+                self.log_agregado.emit(f"Traceback: {traceback.format_exc()}")
+                return None, 0
             
             datos_interseccion = datos_filtrados[mask]
             num_estrellas = len(datos_interseccion)
+            self.log_agregado.emit(f"Intersección completada: {num_estrellas} estrellas pasaron el filtro FAP")
             
             # Guardar el CSV de intersección CON ENCABEZADOS
             csv_interseccion_path = os.path.join(data_folder, 'datos_filtrados_FAP.csv')
-            datos_interseccion.to_csv(csv_interseccion_path, index=False)
+            
+            try:
+                # Verificar que el DataFrame no está vacío antes de guardar
+                if datos_interseccion.empty:
+                    self.log_agregado.emit(f"DataFrame de intersección está vacío")
+                    return csv_interseccion_path, 0
+                
+                datos_interseccion.to_csv(csv_interseccion_path, index=False)
+                
+                # Verificar que el archivo se guardó correctamente
+                if not os.path.exists(csv_interseccion_path):
+                    self.log_agregado.emit(f"El archivo no existe después de guardarlo")
+                    return None, 0
+                    
+            except Exception as e:
+                self.log_agregado.emit(f"Error al guardar CSV de intersección: {e}")
+                import traceback
+                self.log_agregado.emit(f"Traceback: {traceback.format_exc()}")
+                return None, 0
 
             # Eliminar el CSV original datos_filtrados_*.csv
             try:
@@ -727,9 +807,6 @@ class WorkerThread(QThread):
             # Agregar rutas de carpetas si están disponibles
             if lc_i_path and lc_v_path:
                 cmd.extend(['--lc_i', lc_i_path, '--lc_v', lc_v_path])
-            else:
-                self.log_agregado.emit("[WARNING] No se encontraron rutas de carpetas I/V en datos del formulario")
-                self.log_agregado.emit("[INFO] copiar.py buscará carpetas automáticamente")
             
             # Agregar parámetros de período y activar filtro FAP
             cmd.extend(['--aplicar_fap'])
@@ -737,7 +814,6 @@ class WorkerThread(QThread):
             # Usar el mismo valor de periodo max que en el formulario, pbeg siempre será 0.01
             # (self.periodo_max y self.periodo_min ya están configurados en __init__)
             cmd.extend(['--pend', str(self.periodo_max), '--pbeg', str(0.01)])
-            self.log_agregado.emit(f"[INFO] Filtro FAP activado: Pbeg={0.01}, Pend={self.periodo_max}")
             
             # Llamar directamente a copiar.py en lugar de usar subprocess
             try:
@@ -755,40 +831,78 @@ class WorkerThread(QThread):
                 stdout_capture = StringIO()
                 stderr_capture = StringIO()
                 
+                # Liberar memoria antes de operación pesada
+                import gc
+                gc.collect()
+                
+                resultado_exitoso = False
                 with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
                     try:
                         copiar.main()
                         resultado_exitoso = True
+                        
                     except SystemExit as e:
                         resultado_exitoso = (e.code == 0)
+                        if e.code != 0:
+                            self.log_agregado.emit(f"Error en copiar.py: código de salida {e.code}")
+                            
+                    except MemoryError as e:
+                        self.log_agregado.emit(f"Error de memoria en copiar.py: {e}")
+                        resultado_exitoso = False
+                        stderr_capture.write(f"MemoryError: {e}")
+                        
                     except Exception as e:
+                        self.log_agregado.emit(f"Error en copiar.py: {e}")
                         resultado_exitoso = False
                         stderr_capture.write(f"Error: {e}")
+                        import traceback
+                        self.log_agregado.emit(f"Traceback:\n{traceback.format_exc()}")
+                
+                # Limpiar memoria después de operación pesada
+                gc.collect()
                 
                 # Restaurar sys.argv
                 sys.argv = original_argv
                 
                 # Obtener output capturado
-                output = stdout_capture.getvalue()
-                error_output = stderr_capture.getvalue()
+                try:
+                    output = stdout_capture.getvalue()
+                    error_output = stderr_capture.getvalue()
+                except Exception as e:
+                    self.log_agregado.emit(f"Error al capturar output: {e}")
+                    output = ""
+                    error_output = ""
+                
+                if error_output:
+                    self.log_agregado.emit(f"Error en copiar.py:\n{error_output}")
+                
+                # Procesar estadísticas del output sin guardarlo completo (para evitar overflow)
+                if output:
+                    try:
+                        aprobadas = output.count('[FAP APROBADO]')
+                        rechazadas = output.count('[FAP RECHAZADO]')
+                        errores = output.count('[FAP ERROR')
+                        
+                        if aprobadas > 0 or rechazadas > 0:
+                            self.log_agregado.emit(f"FAP: {aprobadas} aprobadas, {rechazadas} rechazadas, {errores} errores")
+                    except Exception as e:
+                        self.log_agregado.emit(f"Error al procesar estadísticas: {e}")
+                
+                # Liberar memoria
+                try:
+                    del stdout_capture, stderr_capture
+                except:
+                    pass
+                gc.collect()
                 
                 if self.ventana_progreso.cancelado:
                     return False, ""
                 
                 if resultado_exitoso:
                     self.log_agregado.emit("Archivos copiados correctamente")
-                    if output:
-                        # Mostrar salida línea por línea para mejor legibilidad
-                        for line in output.strip().split('\n'):
-                            if line.strip():
-                                self.log_agregado.emit(line.strip())
                     return True, nombre_subcarpeta
                 else:
-                    self.log_agregado.emit("ERROR al ejecutar copiar.py")
-                    if error_output:
-                        self.log_agregado.emit(f"Error: {error_output}")
-                    if output:
-                        self.log_agregado.emit(f"Output: {output}")
+                    self.log_agregado.emit("Error al ejecutar copiar.py")
                     return False, ""
                     
             except ImportError:
@@ -853,77 +967,92 @@ class WorkerThread(QThread):
                     
                     if self.ventana_progreso.cancelado or self.cancelacion_forzada:
                         return
+                    
+                    try:
+                        self.log_agregado.emit(linea)
                         
-                    self.log_agregado.emit(linea)
-                    
-                    # Detectar total de estrellas
-                    if "Total de estrellas a procesar:" in linea:
-                        try:
-                            match = AppConstants.REGEX_PATTERNS['total_estrellas'].search(linea)
-                            if match:
-                                total_estrellas = int(match.group(1))
-                                if not analisis_iniciado:
-                                    self.progreso_estrellas.emit(0, total_estrellas)
-                                    analisis_iniciado = True
-                        except Exception as e:
-                            self.log_agregado.emit(f"[ERROR] Error parseando total de estrellas: {e}")
-                    
-                    # Detectar progreso detallado
-                    elif "Progreso:" in linea and "Exitosas:" in linea:
-                        try:
-                            match = AppConstants.REGEX_PATTERNS['progreso_detallado'].search(linea)
-                            if match:
-                                actual = int(match.group(1))
-                                total = int(match.group(2))
-                                
-                                if total_estrellas == 0:
-                                    total_estrellas = total
-                                    analisis_iniciado = True
-                                
-                                self.progreso_estrellas.emit(actual, total)
-                        except Exception as e:
-                            self.log_agregado.emit(f"[ERROR] Error parseando progreso detallado: {e}")
-                    
-                    # Detectar estrella completada
-                    elif "[OK] Estrella" in linea and "completada exitosamente" in linea:
-                        try:
-                            match = AppConstants.REGEX_PATTERNS['estrella_completada'].search(linea)
-                            if match:
-                                estrella_nombre = match.group(1)
-                                tiempo = match.group(2)
-                                self.detalle_cambiado.emit(f"[OK] {estrella_nombre} completada en {tiempo}s")
-                            else:
-                                self.detalle_cambiado.emit("[OK] Estrella completada exitosamente")
-                            
-                            estrellas_procesadas += 1
+                        # Detectar total de estrellas
+                        if "Total de estrellas a procesar:" in linea:
+                            try:
+                                match = AppConstants.REGEX_PATTERNS['total_estrellas'].search(linea)
+                                if match:
+                                    total_estrellas = int(match.group(1))
+                                    if not analisis_iniciado:
+                                        self.progreso_estrellas.emit(0, total_estrellas)
+                                        analisis_iniciado = True
+                            except Exception as e:
+                                self.log_agregado.emit(f"[ERROR] Error parseando total de estrellas: {e}")
+                        
+                        # Detectar mensaje "Procesando estrella X/Y" (más confiable que progreso detallado)
+                        elif "Procesando estrella" in linea and "/" in linea:
+                            try:
+                                match = AppConstants.REGEX_PATTERNS['procesando_estrella'].search(linea)
+                                if match:
+                                    actual = int(match.group(1))
+                                    total = int(match.group(2))
+                                    
+                                    if total_estrellas == 0:
+                                        total_estrellas = total
+                                        analisis_iniciado = True
+                                    
+                                    # Usar el progreso directo de procesofull.py
+                                    self.progreso_estrellas.emit(actual, total)
+                            except Exception as e:
+                                self.log_agregado.emit(f"[ERROR] Error parseando 'Procesando estrella': {e}")
+                        
+                        # Detectar progreso detallado (como respaldo)
+                        elif "Progreso:" in linea and "Exitosas:" in linea:
+                            try:
+                                match = AppConstants.REGEX_PATTERNS['progreso_detallado'].search(linea)
+                                if match:
+                                    actual = int(match.group(1))
+                                    total = int(match.group(2))
+                                    
+                                    if total_estrellas == 0:
+                                        total_estrellas = total
+                                        analisis_iniciado = True
+                                    
+                                    self.progreso_estrellas.emit(actual, total)
+                            except Exception as e:
+                                self.log_agregado.emit(f"[ERROR] Error parseando progreso detallado: {e}")
+                        
+                        # Detectar estrella completada
+                        elif "[OK]" in linea and "completada exitosamente" in linea:
+                            try:
+                                match = AppConstants.REGEX_PATTERNS['estrella_completada'].search(linea)
+                                if match:
+                                    estrella_nombre = match.group(1)
+                                    tiempo = match.group(2)
+                                    self.detalle_cambiado.emit(f"[OK] {estrella_nombre} completada en {tiempo}s")
+                                else:
+                                    self.detalle_cambiado.emit("[OK] Estrella completada exitosamente")
+                            except Exception as e:
+                                self.log_agregado.emit(f"[ERROR] Error parseando estrella completada: {e}")
+                        
+                        # Detectar errores en estrellas
+                        elif "[ERROR] Error en estrella" in linea:
+                            try:
+                                match = AppConstants.REGEX_PATTERNS['estrella_error'].search(linea)
+                                if match:
+                                    estrella_nombre = match.group(1)
+                                    self.detalle_cambiado.emit(f"[ERROR] Error en {estrella_nombre}")
+                                else:
+                                    self.detalle_cambiado.emit("[ERROR] Error en procesamiento de estrella")
+                            except Exception as e:
+                                self.log_agregado.emit(f"[ERROR] Error parseando error de estrella: {e}")
+                        
+                        # Detectar procesamiento completado
+                        elif "Procesamiento completado." in linea:
                             if total_estrellas > 0:
-                                self.progreso_estrellas.emit(estrellas_procesadas, total_estrellas)
-                                
-                        except Exception as e:
-                            self.log_agregado.emit(f"[ERROR] Error parseando estrella completada: {e}")
+                                self.progreso_estrellas.emit(total_estrellas, total_estrellas)
+                            self.estado_cambiado.emit("¡Análisis completado exitosamente!", 100)
+                            self.detalle_cambiado.emit("Procesamiento completado")
                     
-                    # Detectar errores en estrellas
-                    elif "[ERROR] Error en estrella" in linea:
-                        try:
-                            match = AppConstants.REGEX_PATTERNS['estrella_error'].search(linea)
-                            if match:
-                                estrella_nombre = match.group(1)
-                                self.detalle_cambiado.emit(f"[ERROR] Error en {estrella_nombre}")
-                            else:
-                                self.detalle_cambiado.emit("[ERROR] Error en procesamiento de estrella")
-                            
-                            estrellas_procesadas += 1
-                            if total_estrellas > 0:
-                                self.progreso_estrellas.emit(estrellas_procesadas, total_estrellas)
-                        except Exception as e:
-                            self.log_agregado.emit(f"[ERROR] Error parseando error de estrella: {e}")
-                    
-                    # Detectar procesamiento completado
-                    elif "Procesamiento completado." in linea:
-                        if total_estrellas > 0:
-                            self.progreso_estrellas.emit(total_estrellas, total_estrellas)
-                        self.estado_cambiado.emit("¡Análisis completado exitosamente!", 100)
-                        self.detalle_cambiado.emit("Procesamiento completado")
+                    except Exception as e:
+                        # Manejo robusto de errores en procesamiento de líneas
+                        self.log_agregado.emit(f"[ERROR CRÍTICO] Error procesando línea de output: {e}")
+                        import traceback
+                        self.log_agregado.emit(f"Traceback: {traceback.format_exc()}")
                 
                 # Configurar argumentos para procesofull.py
                 original_argv = sys.argv.copy()
@@ -939,7 +1068,9 @@ class WorkerThread(QThread):
                 stderr_capture = StringIO()
                 
                 original_stdout = sys.stdout
+                original_stderr = sys.stderr
                 sys.stdout = stdout_capture
+                sys.stderr = stderr_capture
                 
                 try:
                     procesofull.main()
@@ -951,6 +1082,7 @@ class WorkerThread(QThread):
                     stderr_capture.write(f"Error: {e}")
                 finally:
                     sys.stdout = original_stdout
+                    sys.stderr = original_stderr
                 
                 sys.argv = original_argv
                 
@@ -964,7 +1096,7 @@ class WorkerThread(QThread):
                     error_output = stderr_capture.getvalue()
                     self.log_agregado.emit(f"<b>ERROR al ejecutar procesofull.py</b>")
                     if error_output:
-                        self.log_agregado.emit(f"Error: {error_output}")
+                        self.log_agregado.emit(f"Error stderr: {error_output}")
                     return False
                     
             except ImportError:
@@ -1019,8 +1151,6 @@ def obtener_datos_filtrados(table_main, table_descartadas):
 def realizar_analisis_completo(table_main, table_descartadas, datos_formulario, periodo_max=3, periodo_min=0.01, ventana_subir=None):
     """Método principal para realizar el análisis completo con los datos filtrados"""
     try:
-        print("=== INICIANDO ANÁLISIS ===")
-        
         # Obtener datos filtrados (sin las filas descartadas)
         datos_filtrados = obtener_datos_filtrados(table_main, table_descartadas)
         
@@ -1056,13 +1186,7 @@ def realizar_analisis_completo(table_main, table_descartadas, datos_formulario, 
         callback_ejecutado = [False]  # Flag para saber si el callback terminó
         
         def on_analisis_terminado(exito, mensaje):
-            print(f"=== ANÁLISIS TERMINADO ===")
-            print(f"Éxito: {exito}")
-            print(f"Mensaje: {mensaje}")
-            print(f"Cancelado: {ventana_progreso.cancelado}")
-            
             if ventana_progreso.cancelado:
-                print("Análisis cancelado")
                 ventana_progreso.analisis_completado(exito=False, cancelado=True)
                 ventana_progreso.datos_para_datosf = None
             else:
@@ -1098,7 +1222,6 @@ def realizar_analisis_completo(table_main, table_descartadas, datos_formulario, 
         while worker.isRunning():
             app.processEvents()
             if ventana_progreso.cancelado:
-                print("=== CANCELACIÓN DETECTADA ===")
                 worker.forzar_cancelacion()  # Forzar cancelación del worker
                 break
         
@@ -1114,7 +1237,6 @@ def realizar_analisis_completo(table_main, table_descartadas, datos_formulario, 
         
         # Si fue cancelado, retornar inmediatamente sin mostrar la ventana modal
         if ventana_progreso.cancelado:
-            print("=== ANÁLISIS CANCELADO - RETORNANDO INMEDIATAMENTE ===")
             ventana_progreso.hide()  # Ocultar la ventana
             return False, "Análisis cancelado por el usuario"
         
@@ -1128,12 +1250,6 @@ def realizar_analisis_completo(table_main, table_descartadas, datos_formulario, 
         
         # Usar exec_() para hacer la ventana modal y esperar hasta que se cierre manualmente
         result = ventana_progreso.exec_()  # Esto bloquea hasta que el usuario cierre la ventana
-        
-        print(f"=== RETORNANDO RESULTADO ===")
-        print(f"Ventana cerrada por el usuario con resultado: {result}")
-        print(f"Callback ejecutado: {callback_ejecutado[0]}")
-        print(f"resultado_final[0]: {resultado_final[0]}")
-        print(f"resultado_final[1]: {resultado_final[1]}")
         
         return resultado_final[0], resultado_final[1]
         

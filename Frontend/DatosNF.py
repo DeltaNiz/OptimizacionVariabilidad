@@ -855,13 +855,10 @@ class DatosNF(QMainWindow):
     def abrir_ventana_main(self):
         """Método para volver a las ventanas anteriores y cerrar DatosNF"""
         try:
-            print("=== Iniciando regreso a ventanas anteriores ===")
-            
             # Mostrar las ventanas anteriores primero
             self.mostrar_ventanas_anteriores()
             
             # Cerrar esta ventana
-            print("Cerrando ventana DatosNF...")
             self.close()
             print("Ventana DatosNF cerrada exitosamente")
                 
@@ -873,15 +870,9 @@ class DatosNF(QMainWindow):
     def realizar_analisis(self):
         """Método para realizar el análisis con los datos filtrados usando funciones de Analisis.py"""
         try:
-            print("=== INICIANDO ANÁLISIS DESDE DATOSNF ===")
-            
             # Aplicar automáticamente los valores de período antes del análisis
-            print("Aplicando valores de período...")
             if not self._validar_y_aplicar_periodo():
-                print("Error al aplicar período, análisis cancelado")
                 return  # No continuar si hay error en los valores de período
-            
-            print(f"Período aplicado para análisis: Máx={self.periodo_max}, Mín={self.periodo_min} días")
             
             # Usar la función de Analisis.py con parámetros de período
             exito, mensaje = realizar_analisis_completo(
@@ -892,10 +883,6 @@ class DatosNF(QMainWindow):
                 periodo_min=self.periodo_min,
                 ventana_subir=self.ventana_subir
             )
-            
-            print(f"=== ANÁLISIS COMPLETADO ===")
-            print(f"Éxito: {exito}")
-            print(f"Mensaje completo: {repr(mensaje)}")
             
             # Verificar si el mensaje indica que DatosF se abrió exitosamente
             datosf_abierto = ("✓ Ventana DatosF abierta exitosamente" in str(mensaje) or 
@@ -950,10 +937,8 @@ class DatosNF(QMainWindow):
     def mostrar_datos_formulario(self):
         """Muestra todos los datos recibidos del formulario en la consola para debugging"""
         if self.datos_formulario:
-            print("=== Datos recibidos del formulario ===")
             for key, value in self.datos_formulario.items():
                 print(f"{key}: {value}")
-            print("======================================")
         else:
             print("No se recibieron datos del formulario")
 

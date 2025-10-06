@@ -6,6 +6,13 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 import glob
+import gc  # Para limpieza de memoria
+import warnings  # Para suprimir warnings problemáticos
+
+# Suprimir warnings globalmente para evitar problemas con PyAstronomy
+warnings.filterwarnings('ignore', category=RuntimeWarning)
+warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings('ignore', category=FutureWarning)
 
 # Importar la configuración portable
 try:
@@ -140,11 +147,23 @@ def main():
     # CSV para guardar estrellas que pasan el filtro FAP
     estrellas_fap = []
     
+    # Procesar en chunks para mejor gestión de memoria
+    CHUNK_SIZE = 10  # Liberar memoria cada 10 estrellas
+    contador_chunk = 0
+    
     for i, row in df.iterrows():
         archivoV = row[0]
         archivoI = row[1]
 
         star_name = f'star{i+1}'
+        
+        # Incrementar contador de chunk
+        contador_chunk += 1
+        
+        # Liberar memoria periódicamente
+        if contador_chunk >= CHUNK_SIZE:
+            gc.collect()
+            contador_chunk = 0
         
         # Verificar si los archivos existen antes de cualquier procesamiento
         src1 = os.path.join(carpeta1, archivoI)
@@ -163,11 +182,20 @@ def main():
         # Aplicar filtro FAP si está activado
         if aplicar_filtro_fap:
             try:
-                pasa_filtros, info = verificar_par_archivos(
-                    src2, src1,  # V, I
-                    Pbeg=args.pbeg, 
-                    Pend=args.pend
-                )
+                # Suprimir stdout/stderr de PyAstronomy para evitar problemas
+                import io
+                import contextlib
+                
+                # Capturar warnings y prints de PyAstronomy
+                f = io.StringIO()
+                with contextlib.redirect_stdout(f), contextlib.redirect_stderr(f):
+                    pasa_filtros, info = verificar_par_archivos(
+                        src2, src1,  # V, I
+                        Pbeg=args.pbeg, 
+                        Pend=args.pend
+                    )
+                
+                # Los warnings de PyAstronomy ahora están capturados en f y no afectan el output principal
                 
                 if not pasa_filtros:
                     estrellas_rechazadas_fap += 1
@@ -181,6 +209,12 @@ def main():
                     estrellas_fap.append([archivoV, archivoI])
                     print(f"[FAP APROBADO] {star_name}")
                     
+            except MemoryError as e:
+                print(f"[FAP ERROR MEMORIA] {star_name} - {e}")
+                estrellas_rechazadas_fap += 1
+                # Intentar liberar memoria
+                gc.collect()
+                continue
             except Exception as e:
                 print(f"[FAP ERROR] {star_name} - {e}")
                 estrellas_rechazadas_fap += 1
@@ -204,6 +238,9 @@ def main():
     if aplicar_filtro_fap:
         csv_fap_path = os.path.join(data, 'FAPRevision.csv')
         pd.DataFrame(estrellas_fap, columns=['archivo_V', 'archivo_I']).to_csv(csv_fap_path, index=False, header=False)
+    
+    # Liberar memoria al final
+    gc.collect()
     
     if aplicar_filtro_fap:
         print(f"Estrellas procesadas: {len(df)}")

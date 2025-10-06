@@ -433,17 +433,8 @@ def main():
                     })
                 
                 # Mostrar progreso detallado más frecuentemente para mejor UX
-                # Para datasets pequeños (<=20): mostrar cada estrella completada
-                # Para datasets medianos (21-100): mostrar cada 2-3 estrellas
-                # Para datasets grandes (>100): mostrar cada 5% o mínimo cada 5 estrellas
-                mostrar_progreso = False
-                if total_stars <= 20:
-                    mostrar_progreso = True  # Mostrar cada estrella para datasets pequeños
-                elif total_stars <= 100:
-                    mostrar_progreso = (completed_count % 2 == 0) or (completed_count == total_stars)
-                else:
-                    intervalo = max(5, total_stars // 20)  # Mínimo cada 5 estrellas, máximo cada 5%
-                    mostrar_progreso = (completed_count % intervalo == 0) or (completed_count == total_stars)
+                # SIEMPRE mostrar progreso, independiente del número de estrellas
+                mostrar_progreso = True  # Simplificado: siempre mostrar
                 
                 if mostrar_progreso:
                     porcentaje = (completed_count / total_stars) * 100
