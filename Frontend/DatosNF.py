@@ -695,6 +695,9 @@ class DatosNF(QMainWindow):
             return
         
         try:
+            # Mostrar cursor de carga
+            QApplication.setOverrideCursor(Qt.WaitCursor)
+            
             rangos_validos = self.parsear_rangos(texto_rangos)
             if rangos_validos:
                 # Marcar visualmente las filas
@@ -705,6 +708,9 @@ class DatosNF(QMainWindow):
                 print("No se encontraron rangos válidos")
         except Exception as e:
             print(f"Error al procesar rangos: {e}")
+        finally:
+            # Restaurar cursor normal
+            QApplication.restoreOverrideCursor()
 
     def _validar_y_aplicar_periodo(self):
         """Valida y aplica los valores de período silenciosamente. Retorna True si es exitoso."""
@@ -767,17 +773,24 @@ class DatosNF(QMainWindow):
 
     def limpiar_selecciones(self):
         """Limpia todas las selecciones: checkboxes, marcas visuales y tabla de descartadas"""
-        # Limpiar marcas visuales usando método optimizado
-        self._limpiar_marcas_visuales()
-        
-        # Desactivar todos los checkboxes
-        self._desactivar_todos_checkboxes()
-        
-        # Limpiar el campo de texto de rangos
-        self.input_rangos.clear()
-        
-        # Actualizar información
-        self.actualizar_info_estrellas()
+        try:
+            # Mostrar cursor de carga
+            QApplication.setOverrideCursor(Qt.WaitCursor)
+            
+            # Limpiar marcas visuales usando método optimizado
+            self._limpiar_marcas_visuales()
+            
+            # Desactivar todos los checkboxes
+            self._desactivar_todos_checkboxes()
+            
+            # Limpiar el campo de texto de rangos
+            self.input_rangos.clear()
+            
+            # Actualizar información
+            self.actualizar_info_estrellas()
+        finally:
+            # Restaurar cursor normal
+            QApplication.restoreOverrideCursor()
         
         print("Todas las selecciones han sido limpiadas")
 

@@ -299,6 +299,9 @@ class DatosF(QMainWindow):
         # Instalar filtro de eventos para limpiar selección al hacer clic fuera de la tabla
         self.table_main.viewport().installEventFilter(self)
         
+        # Conectar señal de clic en celda para mostrar imagen correspondiente
+        self.table_main.cellClicked.connect(self._on_tabla_fila_clicked)
+        
         # Aplicar estilos centralizados
         header = self.table_main.horizontalHeader()
         header.setStyleSheet(StyleSheets.HEADER_TABLE)
@@ -1315,6 +1318,19 @@ class DatosF(QMainWindow):
                 # Modo ejemplo
                 # self.mostrar_imagen_ejemplo()
                 pass
+    
+    def _on_tabla_fila_clicked(self, fila):
+        """Maneja el evento de clic en una fila de la tabla para mostrar la imagen correspondiente"""
+        # Verificar que hay imágenes disponibles
+        if not self.imagenes_estrellas or fila >= len(self.imagenes_estrellas):
+            return
+        
+        # Actualizar el índice de la imagen actual a la fila seleccionada
+        self.imagen_actual_index = fila
+        
+        # Mostrar la imagen correspondiente
+        if hasattr(self, 'data_folder') and self.data_folder and os.path.exists(self.data_folder):
+            self.mostrar_imagen_actual()
             
     def cambiar_tipo_imagen(self, tipo):
         """Cambia entre tipos de imagen (periodograma/curva de luz)"""
