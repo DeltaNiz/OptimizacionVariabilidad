@@ -455,8 +455,8 @@ class WorkerThread(QThread):
                 self.analisis_terminado.emit(False, "Análisis cancelado por el usuario")
                 return
                 
-            self.fase_analisis.emit("Ejecutando copiar.py...", 15)
-            self.log_agregado.emit("Ejecutando copiar.py...")
+            self.fase_analisis.emit("Copiando archivos y ejecutando filtro FAP", 15)
+            self.log_agregado.emit("Copiando archivos...")
             
             # Primero generar CSV temporal para copiar.py
             ruta_csv_temporal = self.generar_csv_temporal()
@@ -723,7 +723,6 @@ class WorkerThread(QThread):
             
             datos_interseccion = datos_filtrados[mask]
             num_estrellas = len(datos_interseccion)
-            self.log_agregado.emit(f"Intersección completada: {num_estrellas} estrellas pasaron el filtro FAP")
             
             # Guardar el CSV de intersección CON ENCABEZADOS
             csv_interseccion_path = os.path.join(data_folder, 'datos_filtrados_FAP.csv')

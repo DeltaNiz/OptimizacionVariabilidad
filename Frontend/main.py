@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QApplication, QWidget, QDesktopWidget, QMainWindow, QMenuBar, QLabel, QVBoxLayout
+from PyQt5.QtWidgets import QApplication, QWidget, QDesktopWidget, QMainWindow, QMenuBar, QLabel, QVBoxLayout, QMessageBox
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 import SubirArchivos
@@ -32,7 +32,8 @@ class Main(QMainWindow):
         # Crear un menú "Acerca de"
         about_menu = menuBar.addMenu("Acerca de")
         # Agregar acciones al menú "Acerca de"
-        #about_action = about_menu.addAction("Acerca de")
+        about_action = about_menu.addAction("Acerca de SODEV-CG")
+        about_action.triggered.connect(self.mostrar_acerca_de)
         menuBar.addMenu(about_menu)
     
     def abrir_ventana_subir_archivo(self):
@@ -43,6 +44,31 @@ class Main(QMainWindow):
         self.ventana_subir.setWindowModality(Qt.ApplicationModal)
         # Mostrar la ventana
         self.ventana_subir.show()
+    
+    def mostrar_acerca_de(self):
+        """Muestra una ventana emergente con información sobre la aplicación"""
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Acerca de SODEV-CG")
+        msg.setIcon(QMessageBox.Information)
+        
+        # Configurar color de fondo
+        msg.setStyleSheet("QMessageBox { background-color: #f0f0f0; }")
+        
+        # Texto principal
+        texto = """<h2>SODEV-CG</h2>
+        <p><b><i>Sistema para la Optimización en la Detección de Estrellas Variables en Cúmulos Globulares</i></b></p>
+        <p><i>Versión 0.1.0</i></p>
+        <p><b>Desarrollado por:</b> Tomás Valenzuela Vergara</p>
+        <p><b>Email:</b> tvalenzuela20@alumnos.utalca.cl</p>
+        <p><b>Colaboradores:</b> Tomás Cisternas - Caddy Cortés - Sandro Villanova - Ricardo Pérez - Carolina Salgado</p>
+        <p><b>Institución:</b> Universidad de Talca, Facultad de Ingeniería - Departamento de Ciencias de la Computación, Curicó, Chile.</p>
+        <p><b>Año:</b> 2025</p>
+        """
+        msg.setText(texto)
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.setFixedSize(250, 350)
+        
+        msg.exec_()
 
     def init_ui(self):
         # Configurar el icono de la ventana
