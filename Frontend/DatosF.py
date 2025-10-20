@@ -549,7 +549,9 @@ class DatosF(QMainWindow):
                             'Best Peak GLS V': row.get('Best Peak GLS V', 'N/A'),
                             'Best Peak GLS I': row.get('Best Peak GLS I', 'N/A'),
                             'Best Minima PDM V': row.get('Best Minima PDM V', 'N/A'),
-                            'Best Minima PDM I': row.get('Best Minima PDM I', 'N/A')
+                            'Best Minima PDM I': row.get('Best Minima PDM I', 'N/A'),
+                            'amplitud_V': row.get('amplitud_V', 'N/A'),
+                            'amplitud_I': row.get('amplitud_I', 'N/A')
                         }
                 
                 print(f"Datos de reporte cargados: {len(self.datos_reporte)} estrellas")
@@ -621,6 +623,14 @@ class DatosF(QMainWindow):
             texto_logs += "<u>Análisis PDM:</u><br>"
             texto_logs += f"• Filtro V: <b>{pdm_v}</b> días<br>"
             texto_logs += f"• Filtro I: <b>{pdm_i}</b> días<br><br>"
+            
+            # Amplitudes
+            amp_v = datos.get('amplitud_V', 'N/A')
+            amp_i = datos.get('amplitud_I', 'N/A')
+            
+            texto_logs += "<b>AMPLITUDES (GLS):</b><br>"
+            texto_logs += f"• Filtro V: <b>{amp_v}</b><br>"
+            texto_logs += f"• Filtro I: <b>{amp_i}</b><br><br>"
             
         else:
             # Mostrar información de error si está disponible

@@ -163,7 +163,9 @@ def process_single_star(star_data, Pend=3, Pbeg=0.01):
             'Best Peak GLS V': 1./clp.freq[np.argmax(clp.power)],
             'Best Peak GLS I': 1./clpI.freq[np.argmax(clpI.power)],
             'Best Minima PDM V': (1/f1)[np.argmin(t1)],
-            'Best Minima PDM I': (1/f2)[np.argmin(t2)]
+            'Best Minima PDM I': (1/f2)[np.argmin(t2)],
+            'amplitud_V': clp.hpstat["amp"],
+            'amplitud_I': clpI.hpstat["amp"]
         }
         
     except Exception as e:
