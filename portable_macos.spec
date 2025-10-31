@@ -48,10 +48,8 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    [],
+    [],  # Mover binarios, zipfiles y datas al BUNDLE
+    exclude_binaries=True,  # No incluir binarios en el EXE, solo en el BUNDLE
     name='SODEV-CG',
     debug=False,
     bootloader_ignore_signals=False,
@@ -68,9 +66,20 @@ exe = EXE(
     icon='media/icono.icns'  # Icono .icns para macOS
 )
 
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='SODEV-CG',
+)
+
 # Crear bundle .app para macOS
 app = BUNDLE(
-    exe,
+    coll,
     name='SODEV-CG.app',
     icon='media/icono.icns',
     bundle_identifier='com.sodev.cg',
