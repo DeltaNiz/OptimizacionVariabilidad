@@ -613,15 +613,16 @@ class WorkerThread(QThread):
             return None
 
     def generar_csv_temporal(self):
-        """Genera un archivo CSV temporal en la raíz del proyecto para copiar.py"""
+        """Genera un archivo CSV temporal en una ubicación escribible para copiar.py"""
         try:
             # Generar nombre del archivo con timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             nombre_archivo = f"datos_filtrados_{timestamp}{AppConstants.EXTENSIONES_ARCHIVOS['csv']}"
             
-            # Guardar en la raíz del proyecto (para copiar.py)
-            directorio_actual = os.path.dirname(os.path.abspath(__file__))
-            ruta_archivo = os.path.join(directorio_actual, nombre_archivo)
+            # Usar directorio temporal del sistema (escribible en AppImage)
+            import tempfile
+            directorio_temp = tempfile.gettempdir()
+            ruta_archivo = os.path.join(directorio_temp, nombre_archivo)
             
             # Guardar la ruta del CSV temporal para poder eliminarlo en caso de cancelación
             self.ruta_csv_temporal = ruta_archivo

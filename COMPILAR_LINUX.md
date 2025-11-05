@@ -1,6 +1,22 @@
 # Compilación para Linux - SODEV-CG
 
-## 📋 Requisitos en Linux
+## � Inicio Rápido
+
+```bash
+# 1. Compilar con PyInstaller
+pyinstaller portable_linux.spec
+
+# 2. Crear AppImage (máxima compatibilidad)
+chmod +x crear_appimage.sh
+./crear_appimage.sh
+
+# 3. Probar
+./SODEV-CG-x86_64.AppImage
+```
+
+---
+
+## �📋 Requisitos en Linux
 
 1. **Python 3.8+** y dependencias del sistema:
    ```bash
@@ -50,11 +66,29 @@ tar -czf SODEV-CG-Linux.tar.gz SODEV-CG/
 
 **Nota**: El resultado será una carpeta con el ejecutable y sus dependencias.
 
-### Crear AppImage (opcional, requiere herramientas adicionales)
+### Crear AppImage (Recomendado - Máxima Compatibilidad)
 
-Para crear un AppImage portable:
+AppImage crea un **único archivo ejecutable** que funciona en **cualquier** distribución Linux moderna.
 
-1. **Instalar appimagetool**:
+**Método Automático (Recomendado):**
+```bash
+# Dar permisos de ejecución al script
+chmod +x crear_appimage.sh
+
+# Ejecutar
+./crear_appimage.sh
+```
+
+El script:
+1. ✅ Descarga `appimagetool` automáticamente
+2. ✅ Crea la estructura AppDir
+3. ✅ Genera `SODEV-CG-x86_64.AppImage`
+
+**Método Manual:**
+
+**Método Manual:**
+
+1. **Descargar appimagetool**:
    ```bash
    wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
    chmod +x appimagetool-x86_64.AppImage
@@ -63,11 +97,11 @@ Para crear un AppImage portable:
 2. **Crear estructura AppDir**:
    ```bash
    mkdir -p SODEV-CG.AppDir/usr/bin
-   cp dist/SODEV-CG SODEV-CG.AppDir/usr/bin/
+   cp -r dist/SODEV-CG/* SODEV-CG.AppDir/usr/bin/
    cp media/icono.png SODEV-CG.AppDir/sodev-cg.png
    ```
 
-3. **Crear desktop file**:
+3. **Crear archivo .desktop**:
    ```bash
    cat > SODEV-CG.AppDir/sodev-cg.desktop << 'EOF'
    [Desktop Entry]
@@ -79,10 +113,30 @@ Para crear un AppImage portable:
    EOF
    ```
 
-4. **Generar AppImage**:
+4. **Crear AppRun**:
    ```bash
-   ./appimagetool-x86_64.AppImage SODEV-CG.AppDir SODEV-CG-x86_64.AppImage
+   cat > SODEV-CG.AppDir/AppRun << 'EOF'
+   #!/bin/bash
+   SELF=$(readlink -f "$0")
+   HERE=${SELF%/*}
+   cd "${HERE}/usr/bin"
+   exec "${HERE}/usr/bin/SODEV-CG" "$@"
+   EOF
+   chmod +x SODEV-CG.AppDir/AppRun
    ```
+
+5. **Generar AppImage**:
+   ```bash
+   ARCH=x86_64 ./appimagetool-x86_64.AppImage SODEV-CG.AppDir SODEV-CG-x86_64.AppImage
+   ```
+
+**Resultado**: Un archivo `SODEV-CG-x86_64.AppImage` que funciona en casi cualquier distribución Linux.
+
+**Uso del AppImage**:
+```bash
+chmod +x SODEV-CG-x86_64.AppImage
+./SODEV-CG-x86_64.AppImage
+```
 
 ---
 
@@ -176,6 +230,8 @@ ldd dist/SODEV-CG
 4. **Tamaño**: El ejecutable será de ~150-300 MB debido a todas las dependencias científicas (NumPy, Pandas, Matplotlib).
 
 5. **Ubicación de datos**: En Linux, los análisis se guardan en `~/SODEV-CG/data/` (carpeta home del usuario), no dentro del ejecutable.
+
+6. **AppImage**: Si usas AppImage, los archivos temporales se guardan en `/tmp/` y los análisis en `~/SODEV-CG/data/`. El AppImage monta un sistema de archivos de solo lectura, por lo que todo se escribe fuera del ejecutable.
 
 ---
 
