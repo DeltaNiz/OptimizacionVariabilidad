@@ -30,10 +30,12 @@
 pyinstaller portable_linux.spec
 ```
 
+**Nota**: Genera una carpeta `dist/SODEV-CG/` con el ejecutable y todas sus dependencias (modo onedir).
+
 ### Probar
 ```bash
-chmod +x dist/SODEV-CG
-./dist/SODEV-CG
+cd dist/SODEV-CG
+./SODEV-CG
 ```
 
 ---
@@ -43,8 +45,10 @@ chmod +x dist/SODEV-CG
 ### Crear archivo .tar.gz
 ```bash
 cd dist
-tar -czf SODEV-CG-Linux.tar.gz SODEV-CG
+tar -czf SODEV-CG-Linux.tar.gz SODEV-CG/
 ```
+
+**Nota**: El resultado será una carpeta con el ejecutable y sus dependencias.
 
 ### Crear AppImage (opcional, requiere herramientas adicionales)
 
@@ -93,6 +97,14 @@ Para crear un AppImage portable:
 ---
 
 ## 🔧 Solución de Problemas
+
+### Error: "Failed to extract PIL/_avif" o "Failed to extract matplotlib"
+**Solución**: El archivo `.spec` ahora usa modo "onedir" que evita estos problemas.
+Recompila con:
+```bash
+pyinstaller --clean portable_linux.spec
+```
+El ejecutable estará en `dist/SODEV-CG/SODEV-CG`
 
 ### Error: "libQt5Core.so.5: cannot open shared object file"
 ```bash
@@ -162,6 +174,8 @@ ldd dist/SODEV-CG
 3. **Alternativa AppImage**: Para máxima portabilidad, usa AppImage (incluye todas las dependencias).
 
 4. **Tamaño**: El ejecutable será de ~150-300 MB debido a todas las dependencias científicas (NumPy, Pandas, Matplotlib).
+
+5. **Ubicación de datos**: En Linux, los análisis se guardan en `~/SODEV-CG/data/` (carpeta home del usuario), no dentro del ejecutable.
 
 ---
 

@@ -72,12 +72,18 @@ class Main(QMainWindow):
 
     def init_ui(self):
         # Configurar el icono de la ventana
+        # Detectar formato de icono según la plataforma
+        if sys.platform == 'win32':
+            icon_filename = 'icono.ico'
+        else:
+            icon_filename = 'icono.png'
+        
         if hasattr(sys, '_MEIPASS'):
             # Ruta del icono cuando está empaquetado con PyInstaller
-            icon_path = os.path.join(sys._MEIPASS, 'media', 'icono.ico')
+            icon_path = os.path.join(sys._MEIPASS, 'media', icon_filename)
         else:
             # Ruta del icono en desarrollo
-            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'media', 'icono.ico')
+            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'media', icon_filename)
         
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))

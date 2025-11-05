@@ -243,10 +243,14 @@ class DatosNF(QMainWindow):
         self.setWindowTitle("Optim. Estrellas")
         
         # Configurar el icono de la ventana
+        # Detectar formato de icono según la plataforma
+        import sys
+        icon_filename = 'icono.ico' if sys.platform == 'win32' else 'icono.png'
+        
         if hasattr(sys, '_MEIPASS'):
-            icon_path = os.path.join(sys._MEIPASS, 'media', 'icono.ico')
+            icon_path = os.path.join(sys._MEIPASS, 'media', icon_filename)
         else:
-            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'media', 'icono.ico')
+            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'media', icon_filename)
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
         

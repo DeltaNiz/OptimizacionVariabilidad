@@ -20,19 +20,31 @@ class AppConstants:
         try:
             # Usar la carpeta Documents del usuario actual
             import os
+            import sys
             from pathlib import Path
             
-            # Obtener carpeta Documents del usuario (acceso rápido de Windows)
-            documents_path = Path.home() / "Documents"
-            
-            # Crear carpeta específica de la aplicación
-            app_folder = documents_path / "SODEV-CG"
-            
-            # Crear carpetas necesarias si no existen
-            app_folder.mkdir(exist_ok=True)
-            (app_folder / "data").mkdir(exist_ok=True)
-            
-            return str(app_folder)
+            # Detectar si estamos en modo empaquetado con PyInstaller
+            if getattr(sys, 'frozen', False):
+                # Modo empaquetado - usar carpeta del usuario
+                if sys.platform == 'win32':
+                    # Windows: usar Documents
+                    documents_path = Path.home() / "Documents"
+                else:
+                    # Linux/macOS: usar carpeta home del usuario
+                    documents_path = Path.home()
+                
+                # Crear carpeta específica de la aplicación
+                app_folder = documents_path / "SODEV-CG"
+                
+                # Crear carpetas necesarias si no existen
+                app_folder.mkdir(exist_ok=True)
+                (app_folder / "data").mkdir(exist_ok=True)
+                
+                return str(app_folder)
+            else:
+                # Modo desarrollo - usar carpeta del proyecto
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                return current_dir
             
         except Exception as e:
             # Fallback: usar directorio actual de la aplicación
@@ -140,10 +152,13 @@ class VentanaProgreso(QDialog):
         self.worker_thread = None  # Referencia al worker thread
         
         # Configurar el icono de la ventana
+        # Detectar formato de icono según la plataforma
+        icon_filename = 'icono.ico' if sys.platform == 'win32' else 'icono.png'
+        
         if hasattr(sys, '_MEIPASS'):
-            icon_path = os.path.join(sys._MEIPASS, 'media', 'icono.ico')
+            icon_path = os.path.join(sys._MEIPASS, 'media', icon_filename)
         else:
-            icon_path = os.path.join(os.path.dirname(__file__), 'media', 'icono.ico')
+            icon_path = os.path.join(os.path.dirname(__file__), 'media', icon_filename)
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
         
