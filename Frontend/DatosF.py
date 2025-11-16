@@ -27,7 +27,6 @@ class AppConstants:
     
     # Tamaños de ventana
     WINDOW_MEDIUM = (1375, 975)
-    WINDOW_LARGE = (1600, 1000)
     
     # Headers de tabla
     TABLE_HEADERS = ["Archivo", "ID", "RA", "DEC", "Magnitud", "Período", "Amplitud", "Tipo", "Significancia"]
@@ -278,14 +277,12 @@ class DatosF(QMainWindow):
             self.window_size = None  # No hay tamaño fijo para pantallas pequeñas
             layout_margin = 5
             print(f"Pantalla pequeña detectada ({screen_width}px) - Ventana será maximizada automáticamente")
-        elif screen_width <= AppConstants.SCREEN_MEDIUM:
+        else:
             self.ancho_celda = AppConstants.ANCHO_CELDA_SCREEN_1920
             self.ancho_celda_1 = AppConstants.ANCHO_CELDA_PRIMERA_1920
             self.window_size = AppConstants.WINDOW_MEDIUM
             layout_margin = 5
-        else:
-            self.window_size = AppConstants.WINDOW_LARGE
-            layout_margin = 20
+
         return layout_margin
 
     def _setup_main_table(self):

@@ -116,14 +116,15 @@ class Main(QMainWindow):
             # Guardar dimensiones para fijar al (las resoluciones son distintas al resize porque pyqt asi lo quiso xd)
             self.fixed_width, self.fixed_height = 600, 330
 
-        else:  # Pantallas grandes/4K
-            self.resize(1600, 1000)
+        else:  # Pantallas grandes/4K y 1440p
+            self.resize(700, 410)
             self.setWindowTitle("SODEV-CG")
-            margin_size = "300px"  # Margen grande para pantallas grandes
+            margin_y_size = "70px"  # Margen vertical grande para pantallas grandes
+            margin_x_size = "150px"  # Margen horizontal grande para pantallas grandes
             text_size = "42px"  # Tamaño de texto grande
-            vertical_offset = -20
+            vertical_offset = -70
             # Guardar dimensiones para fijar al final
-            self.fixed_width, self.fixed_height = 1600, 1000
+            self.fixed_width, self.fixed_height = 700, 370
         
         # Centrar la ventana en la pantalla con un offset vertical
         center_point = desktop.screen().rect().center() - self.rect().center()

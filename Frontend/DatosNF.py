@@ -22,7 +22,6 @@ class AppConstants:
     # Dimensiones de ventana por tipo de pantalla
     WINDOW_SMALL = (1175, 666)
     WINDOW_MEDIUM = (1159, 800)
-    WINDOW_LARGE = (1600, 1000)
     
     # Headers de tablas
     TABLE_MAIN_HEADERS = ["N°", "V", "I", "MV", "MI", "Desc."]
@@ -320,14 +319,10 @@ class DatosNF(QMainWindow):
             self.window_size = AppConstants.WINDOW_SMALL
             self.setWindowTitle("SODEV-CG")
             layout_margin = 9
-        elif screen_width <= AppConstants.SCREEN_MEDIUM:
+        else:
             self.window_size = AppConstants.WINDOW_MEDIUM
             self.setWindowTitle("SODEV-CG")
             layout_margin = 5
-        else:
-            self.window_size = AppConstants.WINDOW_LARGE
-            self.setWindowTitle("SODEV-CG")
-            layout_margin = 20
         
         return layout_margin
 

@@ -43,28 +43,101 @@ except ImportError:
 
 def get_optimal_workers():
     """Detecta automáticamente el número óptimo de procesos paralelos"""
+    # Valores por defecto seguros
+    physical_cores = 2
+    estimated_ram_gb = 8
+    
     try:
         # Detectar número de núcleos físicos
-        physical_cores = mp.cpu_count() // 2 if mp.cpu_count() > 2 else mp.cpu_count()
+        try:
+            total_cores = mp.cpu_count()
+            physical_cores = total_cores // 2 if total_cores > 2 else total_cores
+        except Exception:
+            physical_cores = 2
         
-        # Detectar RAM disponible (estimación sin psutil)
-        import platform
-        if platform.system() == "Windows":
-            # Estimación conservadora para Windows
-            estimated_ram_gb = 8  # Asumimos al menos 8GB
-        else:
+        # Detectar RAM disponible de forma real
+        try:
+            import platform
+            system = platform.system()
+            
+            if system == "Linux":
+                # Leer /proc/meminfo en Linux
+                try:
+                    with open('/proc/meminfo', 'r') as mem:
+                        for line in mem:
+                            if line.startswith('MemTotal'):
+                                total_kb = int(line.split()[1])
+                                estimated_ram_gb = max(4, total_kb // (1024 * 1024))
+                                break
+                except Exception:
+                    estimated_ram_gb = 8
+                    
+            elif system == "Windows":
+                # Método simplificado para Windows usando psutil si está disponible
+                try:
+                    import psutil
+                    total_memory = psutil.virtual_memory().total
+                    estimated_ram_gb = max(4, total_memory // (1024**3))
+                except ImportError:
+                    # Fallback sin psutil usando ctypes
+                    try:
+                        import ctypes
+                        class MEMORYSTATUSEX(ctypes.Structure):
+                            _fields_ = [
+                                ("dwLength", ctypes.c_ulong),
+                                ("dwMemoryLoad", ctypes.c_ulong),
+                                ("ullTotalPhys", ctypes.c_ulonglong),
+                                ("ullAvailPhys", ctypes.c_ulonglong),
+                                ("ullTotalPageFile", ctypes.c_ulonglong),
+                                ("ullAvailPageFile", ctypes.c_ulonglong),
+                                ("ullTotalVirtual", ctypes.c_ulonglong),
+                                ("ullAvailVirtual", ctypes.c_ulonglong),
+                                ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+                            ]
+                        
+                        stat = MEMORYSTATUSEX()
+                        stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+                        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
+                        estimated_ram_gb = max(4, stat.ullTotalPhys // (1024**3))
+                    except Exception:
+                        estimated_ram_gb = 8
+                        
+            elif system == "Darwin":  # macOS
+                try:
+                    import subprocess
+                    result = subprocess.run(['sysctl', '-n', 'hw.memsize'], 
+                                          capture_output=True, text=True, timeout=5)
+                    total_bytes = int(result.stdout.strip())
+                    estimated_ram_gb = max(4, total_bytes // (1024**3))
+                except Exception:
+                    estimated_ram_gb = 8
+            else:
+                estimated_ram_gb = 8
+                
+        except Exception:
             estimated_ram_gb = 8
         
         # Calcular workers óptimos basado en memoria y CPU
         # Cada proceso usa ~2-3GB de RAM
         max_workers_by_memory = max(1, min(estimated_ram_gb // 3, 8))
-        max_workers_by_cpu = max(1, min(physical_cores - 1, 12))
+        # Para CPUs: usar todos menos uno, pero mínimo mantener el mismo número si son 2 o menos
+        max_workers_by_cpu = physical_cores if physical_cores <= 2 else max(1, min(physical_cores - 1, 12))
         
         optimal_workers = min(max_workers_by_memory, max_workers_by_cpu)
+        final_workers = max(1, min(optimal_workers, 6))  # Máximo 6 para seguridad
         
-        return max(1, min(optimal_workers, 6))  # Máximo 6 para seguridad
-    except:
-        return 2  # Fallback seguro
+        # Debug info
+        print(f"Recursos detectados:")
+        print(f"  - RAM: {estimated_ram_gb} GB")
+        print(f"  - CPUs: {physical_cores}")
+        print(f"  - Workers: {final_workers}")
+        
+        return final_workers
+        
+    except Exception as e:
+        print(f"Error detectando recursos: {e}")
+        print("Usando valores por defecto: 2 workers")
+        return 2
 
 def process_single_star(star_data, Pend=3, Pbeg=0.01):
     """Procesa una sola estrella de forma independiente"""
