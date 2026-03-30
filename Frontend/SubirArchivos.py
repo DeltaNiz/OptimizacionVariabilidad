@@ -6,7 +6,6 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
 from PyQt5.QtGui import QCursor, QIcon
 import DatosNF
-import time
 import os
 import sys
 
@@ -150,7 +149,6 @@ class SubirArchivos(QMainWindow):
         
         # Configurar el icono de la ventana
         # Detectar formato de icono según la plataforma
-        import sys
         icon_filename = 'icono.ico' if sys.platform == 'win32' else 'icono.png'
         
         if hasattr(sys, '_MEIPASS'):

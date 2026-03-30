@@ -1074,7 +1074,7 @@ class DatosNF(QMainWindow):
             if pd.notna(valor_raw):
                 return self._formatear_valor_numerico(valor_raw, col_tabla)
             return ""
-        except:
+        except Exception:
             return "N/A"
 
     def _formatear_valor_numerico(self, valor_raw, col_tabla):
@@ -1131,7 +1131,7 @@ class DatosNF(QMainWindow):
                     if i < len(columnas):
                         mapeo[1] = i
                         break
-                except:
+                except Exception:
                     continue
         
         # Buscar columnas para I (columna 2 de la tabla)
@@ -1147,7 +1147,7 @@ class DatosNF(QMainWindow):
                     try:
                         mapeo[2] = i
                         break
-                    except:
+                    except Exception:
                         continue
         
         # Buscar columnas para MV (columna 3 de la tabla) - color o diferencia
@@ -1162,7 +1162,7 @@ class DatosNF(QMainWindow):
                     try:
                         mapeo[3] = i
                         break
-                    except:
+                    except Exception:
                         continue
         
         # Buscar columnas para MI (columna 4 de la tabla) - diferencia I o magnitud I calculada
@@ -1177,7 +1177,7 @@ class DatosNF(QMainWindow):
                     try:
                         mapeo[4] = i
                         break
-                    except:
+                    except Exception:
                         continue
         
         # Si no se encontraron mapeos específicos, usar las primeras 4 columnas

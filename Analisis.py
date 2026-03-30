@@ -1,11 +1,10 @@
 from PyQt5.QtWidgets import QApplication, QMessageBox, QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QTextEdit
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QIcon
 import pandas as pd
 import sys
 import argparse
 import os
-import subprocess
 from datetime import datetime
 import re
 from pathlib import Path
@@ -46,7 +45,7 @@ class AppConstants:
                 current_dir = os.path.dirname(os.path.abspath(__file__))
                 return current_dir
             
-        except Exception as e:
+        except Exception:
             # Fallback: usar directorio actual de la aplicación
             import os
             current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -61,13 +60,11 @@ class AppConstants:
     @staticmethod
     def get_data_path():
         """Obtiene la ruta para guardar análisis de datos de forma portable"""
-        from pathlib import Path
         return str(Path(AppConstants.RUTA_BASE_PROYECTO) / "data")
     
     @staticmethod
     def get_analysis_path(analysis_name=None):
         """Obtiene la ruta para un análisis específico dentro de la carpeta data con estructura completa"""
-        from pathlib import Path
         from datetime import datetime
         
         if analysis_name is None:
@@ -87,9 +84,6 @@ class AppConstants:
     @staticmethod
     def _create_analysis_subfolders(analysis_folder):
         """Crea la estructura real de análisis según el formato esperado"""
-        from pathlib import Path
-        
-        analysis_path = Path(analysis_folder)
         
         # Solo crear la carpeta principal del análisis
         # Los archivos CSV se guardan directamente en la raíz del análisis
@@ -106,7 +100,6 @@ class AppConstants:
     @staticmethod
     def get_best_peak_file_path(analysis_path):
         """Obtiene la ruta del archivo Best_Peak_GLS_Min_PDM.csv"""
-        from pathlib import Path
         return str(Path(analysis_path) / "Best_Peak_GLS_Min_PDM.csv")
      
     @staticmethod
@@ -665,8 +658,6 @@ class WorkerThread(QThread):
                 - num_estrellas: Número de estrellas que pasaron el filtro (0 si no se aplicó filtro)
         """
         try:
-            import glob
-            
             # Buscar archivo FAPRevision.csv
             fap_revision_path = os.path.join(data_folder, 'FAPRevision.csv')
             
@@ -676,7 +667,7 @@ class WorkerThread(QThread):
             
             # Verificar el tamaño y contenido del archivo antes de leerlo
             try:
-                fap_size = os.path.getsize(fap_revision_path)
+                os.path.getsize(fap_revision_path)
             except Exception as e:
                 self.log_agregado.emit(f"Error al verificar FAPRevision.csv: {e}")
                 import traceback
@@ -746,14 +737,14 @@ class WorkerThread(QThread):
             try:
                 # Verificar que el DataFrame no está vacío antes de guardar
                 if datos_interseccion.empty:
-                    self.log_agregado.emit(f"DataFrame de intersección está vacío")
+                    self.log_agregado.emit("DataFrame de intersección está vacío")
                     return csv_interseccion_path, 0
                 
                 datos_interseccion.to_csv(csv_interseccion_path, index=False)
                 
                 # Verificar que el archivo se guardó correctamente
                 if not os.path.exists(csv_interseccion_path):
-                    self.log_agregado.emit(f"El archivo no existe después de guardarlo")
+                    self.log_agregado.emit("El archivo no existe después de guardarlo")
                     return None, 0
                     
             except Exception as e:
@@ -795,7 +786,7 @@ class WorkerThread(QThread):
             ruta_copiar = os.path.join(script_dir, 'copiar.py')
             
             if not os.path.exists(ruta_copiar):
-                self.log_agregado.emit(f"ADVERTENCIA: No se encontró copiar.py")
+                self.log_agregado.emit("ADVERTENCIA: No se encontró copiar.py")
                 return False, ""
             
             # Generar nombre único para la subcarpeta del análisis
@@ -906,7 +897,7 @@ class WorkerThread(QThread):
                 # Liberar memoria
                 try:
                     del stdout_capture, stderr_capture
-                except:
+                except Exception:
                     pass
                 gc.collect()
                 
@@ -938,7 +929,7 @@ class WorkerThread(QThread):
             ruta_procesofull = os.path.join(script_dir, 'procesofull.py')
             
             if not os.path.exists(ruta_procesofull):
-                self.log_agregado.emit(f"ADVERTENCIA: No se encontró procesofull.py")
+                self.log_agregado.emit("ADVERTENCIA: No se encontró procesofull.py")
                 return False
 
             self.log_agregado.emit(f"<b>Iniciando análisis con período: máx={self.periodo_max}, mín={self.periodo_min}</b>")
@@ -1109,7 +1100,7 @@ class WorkerThread(QThread):
                     return True
                 else:
                     error_output = stderr_capture.getvalue()
-                    self.log_agregado.emit(f"<b>ERROR al ejecutar procesofull.py</b>")
+                    self.log_agregado.emit("<b>ERROR al ejecutar procesofull.py</b>")
                     if error_output:
                         self.log_agregado.emit(f"Error stderr: {error_output}")
                     return False
@@ -1264,10 +1255,9 @@ def realizar_analisis_completo(table_main, table_descartadas, datos_formulario, 
             time.sleep(0.1)
         
         # Usar exec_() para hacer la ventana modal y esperar hasta que se cierre manualmente
-        result = ventana_progreso.exec_()  # Esto bloquea hasta que el usuario cierre la ventana
-        
+        ventana_progreso.exec_()  # Esto bloquea hasta que el usuario cierre la ventana
+
         return resultado_final[0], resultado_final[1]
-        
     except Exception as e:
         error_msg = f"ERROR en realizar_analisis_completo: {e}"
         print(error_msg)
@@ -1296,12 +1286,10 @@ def procesar_csv_analisis(ruta_csv, parametros):
                     try:
                         # Convertir a numérico, manejando errores
                         df[col] = pd.to_numeric(df[col], errors='coerce')
-                        valores_validos = df[col].dropna()
-                
-                    except:
-                        print(f"No se pudieron calcular estadísticas para columna {col}")
-            
-            
+                        df[col].dropna()
+
+                    except Exception:
+                        print(f"No se pudieron calcular estadísticas para columna {col}")            
             for idx, row in df.head(10).iterrows():
                 print(f"{row['V']:<12} {row['I']:<12} {row['MV']:<12} {row['MI']:<12}")
             

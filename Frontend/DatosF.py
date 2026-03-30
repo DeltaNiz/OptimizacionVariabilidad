@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QPushButton, QLabel,
-    QFrame, QScrollArea, QMessageBox, QFileDialog, QAbstractItemView
+    QFrame, QScrollArea, QAbstractItemView
 )
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QCursor, QPixmap, QIcon
@@ -597,9 +597,9 @@ class DatosF(QMainWindow):
         tiempo = datos.get('time', 0)
         
         if status == 'success':
-            texto_logs += f"<span style='color: green;'>Procesamiento exitoso</span><br>"
+            texto_logs += "<span style='color: green;'>Procesamiento exitoso</span><br>"
         elif status == 'error':
-            texto_logs += f"<span style='color: red;'>Error en procesamiento</span><br>"
+            texto_logs += "<span style='color: red;'>Error en procesamiento</span><br>"
         else:
             texto_logs += f"<span style='color: orange;'>Estado: {status}</span><br>"
         
@@ -636,7 +636,7 @@ class DatosF(QMainWindow):
         else:
             # Mostrar información de error si está disponible
             mensaje = datos.get('message', 'No hay información adicional disponible')
-            texto_logs += f"<b>DETALLES DEL ERROR:</b><br>"
+            texto_logs += "<b>DETALLES DEL ERROR:</b><br>"
             texto_logs += f"<span style='color: red;'>{mensaje}</span><br>"
         
         self.logs_text.setText(texto_logs)
@@ -773,7 +773,6 @@ class DatosF(QMainWindow):
         
         # 2. Intentar desde el nombre de la carpeta de datos
         if self.data_folder and os.path.exists(self.data_folder):
-            nombre_carpeta = os.path.basename(self.data_folder)
             # Buscar patrones como analisis_YYYYMMDD_HHMMSS con carpetas star1, star2, etc.
             try:
                 for item in os.listdir(self.data_folder):
@@ -784,7 +783,7 @@ class DatosF(QMainWindow):
                         if numero.isdigit():
                             return numero
                         break
-            except:
+            except Exception:
                 pass
         
         # 3. Fallback: verificar si hay imágenes cargadas y usar la primera
@@ -1027,7 +1026,7 @@ class DatosF(QMainWindow):
                         archivos_existentes.append(f"{entry.name}/")
             
             if archivos_existentes:
-                info_texto += f"\nArchivos encontrados:\n"
+                info_texto += "\nArchivos encontrados:\n"
                 # Mostrar máximo 10 archivos para mejor rendimiento
                 for archivo in sorted(archivos_existentes)[:10]:
                     info_texto += f"• {archivo}\n"

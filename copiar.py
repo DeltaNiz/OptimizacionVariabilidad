@@ -1,11 +1,8 @@
 import os
 import pandas as pd
 import shutil
-import sys
 import argparse
-from datetime import datetime
 from pathlib import Path
-import glob
 import gc  # Para limpieza de memoria
 import warnings  # Para suprimir warnings problemáticos
 
@@ -142,7 +139,7 @@ def main():
     aplicar_filtro_fap = args.aplicar_fap and FAP_FILTER_AVAILABLE
     
     if aplicar_filtro_fap:
-        print(f"[INFO] Solo se copiarán estrellas que pasen los filtros FAP y amplitud")
+        print("[INFO] Solo se copiarán estrellas que pasen los filtros FAP y amplitud")
     
     # CSV para guardar estrellas que pasan el filtro FAP
     estrellas_fap = []

@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QApplication, QWidget, QDesktopWidget, QMainWindow, QMenuBar, QLabel, QVBoxLayout, QMessageBox
+from PyQt5.QtWidgets import QApplication, QWidget, QDesktopWidget, QMainWindow, QLabel, QVBoxLayout, QMessageBox
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 import SubirArchivos
@@ -92,7 +92,6 @@ class Main(QMainWindow):
         desktop = QDesktopWidget()
         screen_geometry = desktop.screenGeometry()
         screen_width = screen_geometry.width()
-        screen_height = screen_geometry.height()
         vertical_offset = 0
         
         # Lógica similar a media queries

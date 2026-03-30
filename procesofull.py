@@ -13,7 +13,6 @@ import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import Fase_monocolor
 import traceback
-from pathlib import Path
 
 # Configuración especial para PyInstaller y multiprocessing
 def configure_multiprocessing():
@@ -127,7 +126,7 @@ def get_optimal_workers():
         final_workers = max(1, min(optimal_workers, 6))  # Máximo 6 para seguridad
         
         # Debug info
-        print(f"Recursos detectados:")
+        print("Recursos detectados:")
         print(f"  - RAM: {estimated_ram_gb} GB")
         print(f"  - CPUs: {physical_cores}")
         print(f"  - Workers: {final_workers}")
@@ -308,7 +307,7 @@ def generate_plots(clp, clpI, f1, t1, f2, t2, route):
         plt.savefig(os.path.join(route, 'GLSPDM.png'), bbox_inches='tight')
         plt.close()
         
-    except Exception as e:
+    except Exception:
         # Si falla la generación de gráficos, no interrumpir el análisis
         pass
 
@@ -374,9 +373,7 @@ def pdm_with_covers_pypdm_like(time, flux, f_min, f_max, delf, nbin=10, ncovers=
 def main():
     # Asegurar que multiprocessing esté configurado correctamente
     configure_multiprocessing()
-    
-    script_start = t.time()
-    
+
     # Configurar argumentos de línea de comandos
     parser = argparse.ArgumentParser(description='Procesar análisis de estrellas en paralelo - Versión Portable')
     parser.add_argument('--data_folder', help='Ruta específica de carpeta con datos (opcional en modo portable)')

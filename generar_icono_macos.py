@@ -7,7 +7,6 @@ Uso:
     python generar_icono_macos.py
 """
 
-import os
 import sys
 import subprocess
 from pathlib import Path
@@ -44,7 +43,7 @@ def generar_icns():
         
         # Crear directorio iconset
         iconset_dir.mkdir(exist_ok=True)
-        print(f"✓ Creando iconset temporal...")
+        print("✓ Creando iconset temporal...")
         
         # Tamaños estándar para macOS
         sizes = [(16, 16), (32, 32), (128, 128), (256, 256), (512, 512)]
