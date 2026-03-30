@@ -731,6 +731,49 @@ class WorkerThread(QThread):
             datos_interseccion = datos_filtrados[mask]
             num_estrellas = len(datos_interseccion)
             
+            # Agregar columna 'star' usando las carpetas star* que ya existen
+            try:
+                import glob
+
+                # Crear diccionario para mapear (archivoV, archivoI) -> nombre de estrella
+                star_mapping = {}
+                star_folders = glob.glob(os.path.join(data_folder, 'star*'))
+
+                for star_folder in star_folders:
+                    star_name = os.path.basename(star_folder)
+                    # Listar archivos en la carpeta
+                    try:
+                        files = os.listdir(star_folder)
+                        fileV = next((f for f in files if f.endswith('V')), None)
+                        fileI = next((f for f in files if f.endswith('I')), None)
+
+                        if fileV and fileI:
+                            star_mapping[(fileV, fileI)] = star_name
+                    except Exception as e:
+                        self.log_agregado.emit(f"⚠️ Error al leer carpeta {star_name}: {e}")
+                        continue
+
+                # Agregar columna "star" al DataFrame de intersección
+                if star_mapping:
+                    datos_interseccion = datos_interseccion.copy()
+                    datos_interseccion['star'] = datos_interseccion.apply(
+                        lambda row: star_mapping.get((row['V'], row['I']), 'N/A'),
+                        axis=1
+                    )
+
+                    # Reordenar columnas: star, V, I, MV, MI
+                    columnas_orden = ['star', 'V', 'I', 'MV', 'MI']
+                    datos_interseccion = datos_interseccion[columnas_orden]
+
+                    self.log_agregado.emit("✓ Columna de star agregada exitosamente")
+                else:
+                    self.log_agregado.emit("⚠️ No se encontraron carpetas star para mapear nombres")
+            except Exception as e:
+                self.log_agregado.emit(f"⚠️ No se pudo agregar columna de star: {e}")
+                import traceback
+                self.log_agregado.emit(f"Traceback: {traceback.format_exc()}")
+                # Continuar sin la columna de star
+
             # Guardar el CSV de intersección CON ENCABEZADOS
             csv_interseccion_path = os.path.join(data_folder, 'datos_filtrados_FAP.csv')
             

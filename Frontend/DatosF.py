@@ -1109,6 +1109,10 @@ class DatosF(QMainWindow):
             # Leer CSV con encabezados
             df = pd.read_csv(ruta_csv)
             
+            # Omitir la columna 'star' si existe (no mostrarla en la tabla)
+            if 'star' in df.columns:
+                df = df.drop(columns=['star'])
+
             # Agregar columna de número de estrella (índice + 1)
             df.insert(0, 'N°', range(1, len(df) + 1))
             
