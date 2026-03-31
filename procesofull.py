@@ -14,6 +14,14 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import Fase_monocolor
 import traceback
 
+
+def ensure_standard_streams():
+    """Garantiza stdout/stderr válidos en modo GUI o procesos spawn."""
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, 'w', buffering=1)
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, 'w', buffering=1)
+
 # Configuración especial para PyInstaller y multiprocessing
 def configure_multiprocessing():
     """Configurar multiprocessing para compatibilidad con PyInstaller"""
@@ -39,6 +47,14 @@ try:
     PORTABLE_MODE = True
 except ImportError:
     PORTABLE_MODE = False
+
+def safe_flush():
+    """Flush stdout de forma segura (compatible con multiprocessing)"""
+    if sys.stdout is not None and hasattr(sys.stdout, 'flush'):
+        try:
+            sys.stdout.flush()
+        except Exception:
+            pass  # Ignorar errores de flush
 
 def get_optimal_workers():
     """Detecta automáticamente el número óptimo de procesos paralelos"""
@@ -141,6 +157,7 @@ def get_optimal_workers():
 def process_single_star(star_data, Pend=3, Pbeg=0.01):
     """Procesa una sola estrella de forma independiente"""
     data_folder, star_name = star_data
+    ensure_standard_streams()
     
     try:
         route = os.path.join(data_folder, star_name)
@@ -315,7 +332,7 @@ def print_timer(message, start_time):
     """Función auxiliar para imprimir tiempos transcurridos"""
     elapsed = t.time() - start_time
     print(f"[TIMER] {message}: {elapsed:.2f}s")
-    sys.stdout.flush()
+    safe_flush()
     return t.time()  # Retorna nuevo tiempo de inicio
 
 @njit(parallel=True)
@@ -373,6 +390,7 @@ def pdm_with_covers_pypdm_like(time, flux, f_min, f_max, delf, nbin=10, ncovers=
 def main():
     # Asegurar que multiprocessing esté configurado correctamente
     configure_multiprocessing()
+    ensure_standard_streams()
 
     # Configurar argumentos de línea de comandos
     parser = argparse.ArgumentParser(description='Procesar análisis de estrellas en paralelo - Versión Portable')
@@ -478,7 +496,7 @@ def main():
                 
                 # Mensaje de progreso compatible con GUI - EXACTO formato esperado
                 print(f"Procesando estrella {completed_count}/{total_stars}")
-                sys.stdout.flush()
+                safe_flush()
                 
                 try:
                     result = future.result()
@@ -487,16 +505,16 @@ def main():
                     if result['status'] == 'success':
                         successful_stars += 1
                         print(f"[OK] {star_name} completada exitosamente en {result['time']:.1f}s")
-                        sys.stdout.flush()
+                        safe_flush()
                     else:
                         failed_stars += 1
                         print(f"[ERROR] Error en estrella {star_name}: {result.get('message', 'Error desconocido')}")
-                        sys.stdout.flush()
+                        safe_flush()
                         
                 except Exception as e:
                     failed_stars += 1
                     print(f"[ERROR] Error crítico procesando {star_name}: {str(e)}")
-                    sys.stdout.flush()
+                    safe_flush()
                     results.append({
                         'star': star_name,
                         'status': 'critical_error',
@@ -511,7 +529,7 @@ def main():
                 if mostrar_progreso:
                     porcentaje = (completed_count / total_stars) * 100
                     print(f"Progreso: {completed_count}/{total_stars} ({porcentaje:.1f}%) - Exitosas: {successful_stars}, Fallidas: {failed_stars}")
-                    sys.stdout.flush()
+                    safe_flush()
     
     except KeyboardInterrupt:
         print("ADVERTENCIA: Procesamiento interrumpido por el usuario")

@@ -32,30 +32,51 @@ def verificar_par_archivos(ruta_archivo_V, ruta_archivo_I, Pbeg=0.01, Pend=3, fa
             
             # Análisis GLS para V
             clp = pyPeriod.Gls((time, flux), norm="ZK", Pbeg=Pbeg, Pend=Pend)
-            
-            # Análisis GLS para I
-            clpI = pyPeriod.Gls((timeI, fluxI), norm="ZK", Pbeg=Pbeg, Pend=Pend)
-            
-            # Calcular niveles FAP
+
+            # Calcular niveles FAP para V primero
             fapLevels = np.array([0.1, 0.05, 0.01, 0.001])
             plevels = clp.powerLevel(fapLevels)
-            plevelsI = clpI.powerLevel(fapLevels)
-            
-            # Obtener máximos
+
+            # Obtener máximos de V
             ifmax = np.argmax(clp.power)
             pmax = clp.power[ifmax]
-            
+
+            # Verificar filtro FAP y amplitud de V
+            idx_fap = np.where(fapLevels == fap_threshold)[0][0]
+            filtro_fap_V = pmax > plevels[idx_fap]
+            filtro_amplitud_V = clp.hpstat["amp"] * 2 > clp.rms
+
+            # Early exit: Si V no pasa los filtros, no analizar I
+            if not (filtro_fap_V and filtro_amplitud_V):
+                info = {
+                    'pasa_FAP': False,
+                    'pasa_amplitud': filtro_amplitud_V,
+                    'pasa_todos': False,
+                    'early_exit': True,
+                    'razon': 'Filtro V no pasó (FAP o amplitud)'
+                }
+                # Liberar memoria
+                del clp
+                gc.collect()
+                return False, info
+
+            # Solo si V pasa, analizar I
+            clpI = pyPeriod.Gls((timeI, fluxI), norm="ZK", Pbeg=Pbeg, Pend=Pend)
+
+            # Calcular niveles FAP para I
+            plevelsI = clpI.powerLevel(fapLevels)
+
+            # Obtener máximos de I
             ifmaxI = np.argmax(clpI.power)
             pmaxI = clpI.power[ifmaxI]
-            
-            # Verificar filtro FAP
-            idx_fap = np.where(fapLevels == fap_threshold)[0][0]
-            filtro_fap = (pmax > plevels[idx_fap]) and (pmaxI > plevelsI[idx_fap])
-            
-            # Verificar filtro de amplitud
-            filtro_amplitud = (clp.hpstat["amp"] * 2 > clp.rms) and (clpI.hpstat["amp"] * 2 > clpI.rms)
-            
-            # Resultado final
+
+            # Verificar filtro FAP y amplitud de I
+            filtro_fap_I = pmaxI > plevelsI[idx_fap]
+            filtro_amplitud_I = clpI.hpstat["amp"] * 2 > clpI.rms
+
+            # Resultado final (V ya pasó, solo verificar I)
+            filtro_fap = filtro_fap_V and filtro_fap_I
+            filtro_amplitud = filtro_amplitud_V and filtro_amplitud_I
             pasa_filtros = filtro_fap and filtro_amplitud
             
             # Información del análisis
