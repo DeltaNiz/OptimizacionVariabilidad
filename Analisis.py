@@ -765,7 +765,6 @@ class WorkerThread(QThread):
                     columnas_orden = ['star', 'V', 'I', 'MV', 'MI']
                     datos_interseccion = datos_interseccion[columnas_orden]
 
-                    self.log_agregado.emit("✓ Columna de star agregada exitosamente")
                 else:
                     self.log_agregado.emit("⚠️ No se encontraron carpetas star para mapear nombres")
             except Exception as e:
@@ -930,7 +929,7 @@ class WorkerThread(QThread):
                     try:
                         aprobadas = output.count('[FAP APROBADO]')
                         rechazadas = output.count('[FAP RECHAZADO]')
-                        errores = output.count('[FAP ERROR')
+                        errores = output.count('[FAP ERROR]')
                         
                         if aprobadas > 0 or rechazadas > 0:
                             self.log_agregado.emit(f"FAP: {aprobadas} aprobadas, {rechazadas} rechazadas, {errores} errores")
